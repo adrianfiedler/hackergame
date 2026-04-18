@@ -1,5 +1,4 @@
 import { createContext, useContext, useState, useEffect } from 'react'
-import LoginScreen from './LoginScreen.jsx'
 import socket from '../socket.js'
 
 const AuthContext = createContext(null)
@@ -27,14 +26,13 @@ export function AuthProvider({ children }) {
           setStatus('authed')
           socket.connect()
         } else {
-          setStatus('anon')
+          window.location.href = '/auth/google'
         }
       })
-      .catch(() => setStatus('anon'))
+      .catch(() => { window.location.href = '/auth/google' })
   }, [])
 
   if (status === 'loading') return <BootLoader />
-  if (status === 'anon')    return <LoginScreen />
 
   return (
     <AuthContext.Provider value={{ player, setPlayer, machine, setMachine, localData, setLocalData }}>
