@@ -148,3 +148,15 @@ export default async function authRoutes(fastify) {
           maxAge:   7 * 24 * 60 * 60,
         })
         .redirect('/')
+    } catch (err) {
+      console.error('[auth] callback error:', err)
+      reply.redirect('/?auth_error=1')
+    }
+  })
+
+  fastify.get('/auth/logout', async (req, reply) => {
+    reply
+      .clearCookie('hx_token', { path: '/' })
+      .redirect('/')
+  })
+}
