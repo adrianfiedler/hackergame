@@ -136,7 +136,7 @@ export default function App() {
     const el = document.getElementById('boot')
     if (!el) return
     el.innerHTML = "<div class='hdr'>HX//OS BOOT SEQUENCE</div>"
-    el.style.display = 'flex'
+    el.style.display = 'block'
     let i = 0
     const id = setInterval(() => {
       if (i >= lines.length) {

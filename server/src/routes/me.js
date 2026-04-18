@@ -22,7 +22,9 @@ export default async function meRoutes(fastify) {
     )
 
     const hashrate = calcHashrate(machine)
-    const localData = player.local_data ? JSON.parse(player.local_data) : {}
+    const localData = typeof player.local_data === 'string'
+      ? JSON.parse(player.local_data)
+      : (player.local_data || {})
 
     return {
       player: {
