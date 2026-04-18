@@ -20,9 +20,8 @@
 
 ## Source of truth
 - Prefer editing `client/src/*` and `server/src/*`.
-- Root-level files like `app.jsx`, `apps.jsx`, `terminal.jsx`, `state.jsx`, etc. appear to be older duplicates, not the active client entrypoint.
+- The old singleplayer root app has been moved to `legacy/singleplayer-root/` for reference. The repo root is now just the workspace/package entrypoint.
 
 ## Important caveats
-- Likely broken client import today: `client/src/app.jsx` imports `./window-manager.jsx`, but the file present is `client/src/window-manager-jsx`.
 - `server/src/migrate.js` uses a naive semicolon split on `schema.sql`; keep SQL simple unless migration parsing is improved.
 - The repo currently depends on env config for MySQL, JWT, cookies, and Google OAuth in `server/.env`.
