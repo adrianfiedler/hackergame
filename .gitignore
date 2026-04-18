@@ -1,0 +1,8 @@
+node_modules/
+dist/
+server/public/
+# Environment files with secrets — NEVER commit these
+server/.env
+client/.env
+*.log
+.DS_Store
