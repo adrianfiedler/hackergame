@@ -76,8 +76,8 @@ export default function App() {
 
   // Socket.io: receive mining tick from server → update balance
   useEffect(() => {
-    socket.on('mining:tick', ({ newBalance, hashrate }) => {
-      setState(s => ({ ...s, crypto: newBalance, hashrate }))
+    socket.on('mining:tick', ({ newBalance, hashrate, earned }) => {
+      setState(s => ({ ...s, crypto: newBalance, hashrate, lastTickAt: Date.now(), lastTickEarned: earned }))
     })
     return () => { socket.off('mining:tick') }
   }, [])

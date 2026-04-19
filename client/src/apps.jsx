@@ -230,35 +230,52 @@ export function TrashApp({ state, setState }) {
 
 // ── Miner ─────────────────────────────────────────────────────────────────────
 // Visual display only — balance is updated by server-side mining:tick via Socket.io
-export function Miner({ state }) {
-  const [hash, setHash]       = useState('0x00000000000000000000000000000000')
-  const [progress, setProgress] = useState(0)
-  const [running, setRunning] = useState(true)
-  const [blocks, setBlocks]   = useState(0)
-  const [log, setLog]         = useState([])
-  const hrRef = useRef(state.hashrate)
-  hrRef.current = state.hashrate
+const TICK_MS = 10_000
 
+export function Miner({ state }) {
+  const [hash, setHash]     = useState('0x00000000000000000000000000000000')
+  const [progress, setProgress] = useState(0)
+  const [running, setRunning]   = useState(true)
+  const [blocks, setBlocks]     = useState(0)
+  const [log, setLog]           = useState([])
+
+  // Hash scramble — purely cosmetic, independent of tick
   useEffect(() => {
     if (!running) return
     const id = setInterval(() => {
       const rand = Array.from({ length: 32 }, () => '0123456789abcdef'[Math.floor(Math.random() * 16)]).join('')
       setHash('0x' + rand)
-      setProgress(p => {
-        const step = 0.2 + hrRef.current * 0.08
-        const np = p + step
-        if (np >= 100) {
-          const reward = 0.003 + hrRef.current * 0.0006
-          setBlocks(b => b + 1)
-          setLog(l => [`[+] BLOCK ${String(Date.now()).slice(-6)} hashed — ${reward.toFixed(5)} ⟠ pending`, ...l].slice(0, 6))
-          Audio.coin()
-          return 0
-        }
-        return np
-      })
     }, 80)
     return () => clearInterval(id)
   }, [running])
+
+  // Anchor ref — updated on each tick without restarting the rAF loop
+  const anchorRef = useRef(Date.now())
+  useEffect(() => {
+    if (state.lastTickAt) anchorRef.current = state.lastTickAt
+  }, [state.lastTickAt])
+
+  // Single persistent rAF loop — reads anchorRef so it never restarts mid-cycle
+  useEffect(() => {
+    if (!running) return
+    let raf
+    const step = () => {
+      const elapsed = Date.now() - anchorRef.current
+      setProgress(Math.min((elapsed / TICK_MS) * 100, 100))
+      raf = requestAnimationFrame(step)
+    }
+    raf = requestAnimationFrame(step)
+    return () => cancelAnimationFrame(raf)
+  }, [running])
+
+  // Fire block-found visual on each real server tick
+  useEffect(() => {
+    if (!state.lastTickAt) return
+    const earned = state.lastTickEarned ?? 0
+    setBlocks(b => b + 1)
+    setLog(l => [`[+] BLOCK ${String(state.lastTickAt).slice(-6)} confirmed — +${earned.toFixed ? earned.toFixed(6) : earned} ⟠`, ...l].slice(0, 6))
+    Audio.coin()
+  }, [state.lastTickAt])
 
   return (
     <div className="miner">
