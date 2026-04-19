@@ -26,10 +26,19 @@ export default async function defenseRoutes(fastify, io, onlinePlayers) {
       await conn.beginTransaction()
 
       const [[player]]  = await conn.query('SELECT crypto FROM players WHERE id = ? FOR UPDATE', [playerId])
+      if (!player) {
+        await conn.rollback()
+        return reply.code(404).send({ error: 'player_not_found' })
+      }
+
       const [[machine]] = await conn.query(
-        'SELECT id, firewall_lvl, rig_level, cpu_level, net_level FROM machines WHERE owner_id = ? FOR UPDATE',
+        'SELECT id, firewall_lvl FROM machines WHERE owner_id = ? FOR UPDATE',
         [playerId]
       )
+      if (!machine) {
+        await conn.rollback()
+        return reply.code(404).send({ error: 'machine_not_found' })
+      }
 
       if (machine.firewall_lvl >= FIREWALL_MAX_LEVEL) {
         await conn.rollback()
@@ -62,15 +71,14 @@ export default async function defenseRoutes(fastify, io, onlinePlayers) {
   fastify.post('/api/machine/defense/ids', { preHandler: requireAuth }, async (req, reply) => {
     const { playerId } = req.player
 
-    const [[machine]] = await db.query(
-      'SELECT id, ids_active FROM machines WHERE owner_id = ?',
+    const [result] = await db.query(
+      'UPDATE machines SET ids_active = 1 - ids_active WHERE owner_id = ?',
       [playerId]
     )
+    if (result.affectedRows === 0) return reply.code(404).send({ error: 'machine_not_found' })
 
-    const newState = machine.ids_active ? 0 : 1
-    await db.query('UPDATE machines SET ids_active = ? WHERE id = ?', [newState, machine.id])
-
-    return { ok: true, idsActive: !!newState }
+    const [[machine]] = await db.query('SELECT ids_active FROM machines WHERE owner_id = ?', [playerId])
+    return { ok: true, idsActive: !!machine.ids_active }
   })
 
   // POST /api/machine/defense/purge — evict all intruders; costs 2× daily income
@@ -82,10 +90,19 @@ export default async function defenseRoutes(fastify, io, onlinePlayers) {
       await conn.beginTransaction()
 
       const [[player]]  = await conn.query('SELECT crypto FROM players WHERE id = ? FOR UPDATE', [playerId])
+      if (!player) {
+        await conn.rollback()
+        return reply.code(404).send({ error: 'player_not_found' })
+      }
+
       const [[machine]] = await conn.query(
         'SELECT id, rig_level, cpu_level, net_level FROM machines WHERE owner_id = ? FOR UPDATE',
         [playerId]
       )
+      if (!machine) {
+        await conn.rollback()
+        return reply.code(404).send({ error: 'machine_not_found' })
+      }
 
       const hashrate = calcHashrate(machine)
       const cost     = dailyIncome(hashrate) * 2
@@ -100,11 +117,12 @@ export default async function defenseRoutes(fastify, io, onlinePlayers) {
         [machine.id]
       )
 
+      const newCrypto = Number(player.crypto) - cost
       await conn.query('DELETE FROM machine_access WHERE machine_id = ?', [machine.id])
-      await conn.query('UPDATE players SET crypto = crypto - ? WHERE id = ?', [cost, playerId])
+      await conn.query('UPDATE players SET crypto = ? WHERE id = ?', [newCrypto, playerId])
 
       await conn.commit()
-      return { ok: true, purgedCount: count, cost, newCrypto: Number(player.crypto) - cost }
+      return { ok: true, purgedCount: count, cost, newCrypto }
     } catch (err) {
       await conn.rollback()
       throw err
