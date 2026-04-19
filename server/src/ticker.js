@@ -19,41 +19,92 @@ export function calcHashrate(machine) {
 }
 
 function calcIncome(hashrate) {
-  return parseFloat((hashrate * INCOME_PER_HS_PER_TICK).toFixed(6))
+  return hashrate * INCOME_PER_HS_PER_TICK
 }
+
+const SLAVE_CAP_MULTIPLIER = 5  // max slave income = 5× own income
 
 // onlinePlayers: Map<playerId, socketId> — injected by index.js
 export function startTicker(io, onlinePlayers) {
+  let running = false
+
   setInterval(async () => {
+    if (running) return
+    running = true
     try {
-      const [rows] = await db.query(`
-        SELECT p.id, p.crypto,
-               m.rig_level, m.cpu_level, m.net_level
-        FROM players p
-        JOIN machines m ON m.owner_id = p.id
-      `)
+      const [[rows], [slaveRows]] = await Promise.all([
+        db.query(`
+          SELECT p.id, p.crypto,
+                 m.rig_level, m.cpu_level, m.net_level
+          FROM players p
+          JOIN machines m ON m.owner_id = p.id
+        `),
+        db.query(`
+          SELECT ma.controller_id,
+                 ma.mining_share,
+                 sm.rig_level, sm.cpu_level, sm.net_level
+          FROM machine_access ma
+          JOIN machines sm ON sm.id = ma.machine_id
+        `),
+      ])
+
+      // Build map: controller_id → [{slaveHashrate, miningShare}, ...]
+      const slaveMap = new Map()
+      for (const s of slaveRows) {
+        const slaveHashrate = calcHashrate(s)
+        const entry = { slaveHashrate, miningShare: Number(s.mining_share) }
+        if (!slaveMap.has(s.controller_id)) slaveMap.set(s.controller_id, [])
+        slaveMap.get(s.controller_id).push(entry)
+      }
+
+      // Compute new balances and collect socket notifications
+      const updates = []       // [newBalance, playerId]
+      const notifications = [] // { socketId, payload }
 
       for (const row of rows) {
-        const hashrate = calcHashrate(row)
-        const income   = calcIncome(hashrate)
-        const newBalance = parseFloat((Number(row.crypto) + income).toFixed(6))
+        const hashrate  = calcHashrate(row)
+        const ownIncome = calcIncome(hashrate)
 
-        await db.query(
-          'UPDATE players SET crypto = ? WHERE id = ?',
-          [newBalance, row.id]
-        )
+        const cap = ownIncome * SLAVE_CAP_MULTIPLIER
+        let slaveIncome = 0
+        for (const { slaveHashrate, miningShare } of (slaveMap.get(row.id) ?? [])) {
+          slaveIncome += slaveHashrate * (miningShare / 100) * INCOME_PER_HS_PER_TICK
+        }
+        slaveIncome = Math.min(slaveIncome, cap)
+
+        const income     = ownIncome + slaveIncome
+        const newBalance = Number(row.crypto) + income
+
+        updates.push([row.id, newBalance])
 
         const socketId = onlinePlayers.get(row.id)
         if (socketId) {
-          io.to(socketId).emit('mining:tick', {
-            earned:     income,
-            newBalance,
-            hashrate,
+          notifications.push({
+            socketId,
+            payload: { earned: income, ownEarned: ownIncome, slaveEarned: slaveIncome, newBalance, hashrate },
           })
         }
       }
+
+      // Single bulk UPDATE for all players
+      if (updates.length > 0) {
+        const cases  = updates.map(() => 'WHEN ? THEN ?').join(' ')
+        const ids    = updates.map(([id]) => id)
+        const params = updates.flatMap(([id, bal]) => [id, bal])
+        await db.query(
+          `UPDATE players SET crypto = CASE id ${cases} END WHERE id IN (${ids.map(() => '?').join(', ')})`,
+          [...params, ...ids]
+        )
+      }
+
+      // Emit after DB write is confirmed
+      for (const { socketId, payload } of notifications) {
+        io.to(socketId).emit('mining:tick', payload)
+      }
     } catch (err) {
       console.error('[ticker] error:', err.message)
+    } finally {
+      running = false
     }
   }, TICK_MS)
 

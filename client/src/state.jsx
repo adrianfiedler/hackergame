@@ -82,8 +82,12 @@ export const Audio = {
 }
 
 // ── Formatting ────────────────────────────────────────────────────────────────
+const SUFFIXES = ['', 'K', 'M', 'B', 'T', 'Qa', 'Qi', 'Sx', 'Sp', 'Oc', 'No', 'Dc']
 export function fmtCrypto(n) {
+  if (!isFinite(n) || isNaN(n)) return '0'
   if (n < 1)    return n.toFixed(4)
   if (n < 1000) return n.toFixed(3)
-  return n.toFixed(2)
+  const exp   = Math.min(Math.floor(Math.log10(n) / 3), SUFFIXES.length - 1)
+  const value = n / Math.pow(1000, exp)
+  return value.toFixed(3) + SUFFIXES[exp]
 }

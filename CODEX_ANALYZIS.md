@@ -9,8 +9,8 @@ The reset command is misleading. It wipes localStorage only in client/src/termin
 Upgrade state can temporarily desync. The terminal does an optimistic local deduction and level/hashrate bump before the server confirms in client/src/terminal.jsx (line 276), and on failure it never rolls back. That is a reliability issue even before future systems land.
 Backlog vs Schema
 
-Item 1 fits the current schema well. Exponential costs/hashrate only need logic changes in ticker.js, me.js, player.js, and terminal display.
-Item 2 mostly fits, but machine_access is missing a good lookup index for controller_id; the current unique key is (machine_id, controller_id) in server/src/schema.sql (line 48), which is not ideal for “find all slaves controlled by player X”.
+Item 1 fits the current schema well. Exponential costs/hashrate only need logic changes in ticker.js, me.js, player.js, and terminal display. --> DONE
+Item 2 mostly fits, but machine_access is missing a good lookup index for controller_id; the current unique key is (machine_id, controller_id) in server/src/schema.sql (line 48), which is not ideal for “find all slaves controlled by player X”. -->  DONE: added KEY idx_ma_controller (controller_id) to machine_access
 Item 3 fits the schema well. machine_access and hack_log are already shaped for it.
 Item 4 has a real schema conflict. NPC access expiry needs either an expires_at column on machine_access or a separate NPC access table; currently there is only installed_at in server/src/schema.sql (line 46). More importantly, NPCs don’t fit the current machines.owner_id -> players.id requirement in server/src/schema.sql (line 23). You would need fake players for NPC machines, nullable ownership, or a dedicated NPC target table.
 Item 5 fits reasonably. firewall_lvl, ids_active, and honeypot_on already exist in server/src/schema.sql (line 29), but there is no system yet to emit alerts into the real per-player system channel.

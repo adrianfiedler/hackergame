@@ -36,13 +36,14 @@ Priority order. Each item is roughly self-contained.
 - Replaced linear hashrate with `baseHs * hsGrowth^(level-1)` per component in `ticker.js`.
 - Updated terminal upgrade display and added `sysinfo` / `specs` command in `terminal.jsx`.
 
-### 2. Activate machine_access mining divert in ticker ✦ CURRENT FOCUS
-- In `ticker.js`, after calculating a player's own income, query their `machine_access` rows (where `controller_id = player`).
-- For each slave: add `slave_hashrate * (mining_share / 100) * 0.001` to the controller's income.
-- Cap total slave income at 5× the controller's own local income.
-- Slave hashrate is read from the slave's `machines` row via the same `calcHashrate()`.
+### 2. Activate machine_access mining divert in ticker ✅ DONE
+- Bulk SELECT of all machine_access rows (with slave machine specs) each tick via a parallel query.
+- Slave income = `slave_hashrate * (mining_share / 100) * 0.001`, capped at 5× own income.
+- Single CASE-based bulk UPDATE replaces N per-player queries; overlap guard prevents double-ticks.
+- NPC machines seeded in schema.sql; `POST /api/player/hack-access` creates machine_access on hack success.
+- Client displays local H/s, botnet H/s, and total H/s in miner app, `sysinfo`, `wallet`, and tray.
 
-### 3. Server-side hack validation
+### 3. Server-side hack validation ✦ CURRENT FOCUS
 - Move puzzle outcome from client-trust to a server-verified flow.
 - Client sends puzzle answer to a new `POST /api/hack/solve` endpoint.
 - Server re-validates the answer, then creates `machine_access` + `hack_log` rows.

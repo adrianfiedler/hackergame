@@ -265,9 +265,13 @@ export function Miner({ state }) {
   // Fire block-found visual on each real server tick
   useEffect(() => {
     if (!state.lastTickAt) return
-    const earned = state.lastTickEarned ?? 0
+    const earned      = state.lastTickEarned ?? 0
+    const slaveEarned = state.slaveEarned ?? 0
+    const detail      = slaveEarned > 0
+      ? `+${fmtCrypto(earned - slaveEarned)} local +${fmtCrypto(slaveEarned)} botnet`
+      : `+${fmtCrypto(earned)}`
     setBlocks(b => b + 1)
-    setLog(l => [`[+] BLOCK ${String(state.lastTickAt).slice(-6)} confirmed — +${earned.toFixed ? earned.toFixed(6) : earned} ⟠`, ...l].slice(0, 6))
+    setLog(l => [`[+] BLOCK ${String(state.lastTickAt).slice(-6)} confirmed — ${detail} ⟠`, ...l].slice(0, 6))
     Audio.coin()
   }, [state.lastTickAt])
 
@@ -282,7 +286,9 @@ export function Miner({ state }) {
         {synced && <div key={tickCount} style={{ animation: `miner-bar ${TICK_MS}ms linear forwards` }} />}
       </div>
       <div className="stats">
-        <div className="k">hashrate</div><div className="v">{state.hashrate} H/s</div>
+        <div className="k">local H/s</div><div className="v">{state.hashrate} H/s</div>
+        <div className="k">botnet H/s</div><div className="v">{Math.round((state.slaveEarned ?? 0) * 1000)} H/s</div>
+        <div className="k">total H/s</div><div className="v">{state.hashrate + Math.round((state.slaveEarned ?? 0) * 1000)} H/s</div>
         <div className="k">blocks hashed</div><div className="v">{blocks}</div>
         <div className="k">wallet</div><div className="v">{fmtCrypto(state.crypto)} ⟠</div>
         <div className="k">status</div><div className="v" style={{color: !synced ? '#f5a623' : running ? 'var(--primary)' : '#6b7aa8'}}>{!synced ? 'CONNECTING...' : running ? 'ONLINE' : 'paused'}</div>

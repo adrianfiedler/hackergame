@@ -76,8 +76,8 @@ export default function App() {
 
   // Socket.io: receive mining tick from server → update balance
   useEffect(() => {
-    socket.on('mining:tick', ({ newBalance, hashrate, earned }) => {
-      setState(s => ({ ...s, crypto: newBalance, hashrate, lastTickAt: Date.now(), lastTickEarned: earned }))
+    socket.on('mining:tick', ({ newBalance, hashrate, earned, ownEarned, slaveEarned }) => {
+      setState(s => ({ ...s, crypto: newBalance, hashrate, lastTickAt: Date.now(), lastTickEarned: earned, ownEarned: ownEarned ?? earned, slaveEarned: slaveEarned ?? 0 }))
     })
     return () => { socket.off('mining:tick') }
   }, [])
@@ -292,7 +292,7 @@ export default function App() {
         </div>
         <div id="tray">
           <div className="stat"><span className="k">⟠</span><span className="v">{fmtCrypto(state.crypto)}</span></div>
-          <div className="stat"><span className="k">H/s</span><span className="v">{state.hashrate}</span></div>
+          <div className="stat"><span className="k">H/s</span><span className="v">{state.hashrate + Math.round((state.slaveEarned ?? 0) * 1000)}</span></div>
           <div id="clock" title={fmtDate(clock)}>{fmtClock(clock)} · {fmtDate(clock)}</div>
         </div>
       </div>

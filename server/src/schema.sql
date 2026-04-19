@@ -46,6 +46,7 @@ CREATE TABLE IF NOT EXISTS machine_access (
   installed_at  DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (id),
   UNIQUE KEY uq_machine_controller (machine_id, controller_id),
+  KEY idx_ma_controller (controller_id),
   CONSTRAINT fk_access_machine FOREIGN KEY (machine_id) REFERENCES machines (id) ON DELETE CASCADE,
   CONSTRAINT fk_access_ctrl FOREIGN KEY (controller_id) REFERENCES players (id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
@@ -127,3 +128,18 @@ INSERT IGNORE INTO channels (id, name, kind) VALUES
   ('00000000-0000-0000-0001-000000000001', '#general', 'public'),
   ('00000000-0000-0000-0001-000000000002', '#trading',  'public'),
   ('00000000-0000-0000-0001-000000000003', '#wanted',   'public');
+
+-- NPC system player (owns all hardcoded hack targets)
+INSERT IGNORE INTO players (id, google_id, username, wallet_addr, grace_ends_at) VALUES
+  ('00000000-0000-0000-0000-000000000001', 'npc_system', '[NPC]', '0x0000000000000000000000000000000000000001', '2099-01-01 00:00:00');
+
+-- NPC machines — difficulty maps to upgrade levels (1→1, 2→2, 3→3, 4→4)
+INSERT IGNORE INTO machines (id, owner_id, hostname, ip_address, rig_level, cpu_level, net_level) VALUES
+  ('00000000-0000-0000-0002-000000000001', '00000000-0000-0000-0000-000000000001', 'gibson.mil',          '10.0.4.7',      1, 1, 1),
+  ('00000000-0000-0000-0002-000000000002', '00000000-0000-0000-0000-000000000001', 'mainframe.ellingson', '198.51.100.23', 2, 2, 2),
+  ('00000000-0000-0000-0002-000000000003', '00000000-0000-0000-0000-000000000001', 'gateway.globalnet',   '203.0.113.8',   2, 2, 2),
+  ('00000000-0000-0000-0002-000000000004', '00000000-0000-0000-0000-000000000001', 'darkstar.corp',       '172.16.9.42',   3, 3, 3),
+  ('00000000-0000-0000-0002-000000000005', '00000000-0000-0000-0000-000000000001', 'nsa.gov.ghost',       '192.0.2.99',    4, 4, 4),
+  ('00000000-0000-0000-0002-000000000006', '00000000-0000-0000-0000-000000000001', 'orbital.sat-7',       '198.18.7.7',    3, 3, 3),
+  ('00000000-0000-0000-0002-000000000007', '00000000-0000-0000-0000-000000000001', 'atm-central.bnk',     '10.10.10.10',   2, 2, 2),
+  ('00000000-0000-0000-0002-000000000008', '00000000-0000-0000-0000-000000000001', 'phreak.pbx.7734',     '64.64.64.64',   1, 1, 1);

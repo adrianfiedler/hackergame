@@ -11,7 +11,7 @@ const UPGRADE_CONFIG = {
 }
 
 export function upgradeCost(cfg, currentLevel) {
-  return parseFloat((cfg.baseCost * Math.pow(cfg.costGrowth, currentLevel - 1)).toFixed(6))
+  return cfg.baseCost * Math.pow(cfg.costGrowth, currentLevel - 1)
 }
 
 export default async function playerRoutes(fastify) {
@@ -57,7 +57,7 @@ export default async function playerRoutes(fastify) {
       }
 
       const newLevel   = currentLevel + 1
-      const newCrypto  = parseFloat((Number(player.crypto) - cost).toFixed(6))
+      const newCrypto  = Number(player.crypto) - cost
       const newHashrate = calcHashrate({ ...machine, [cfg.column]: newLevel })
 
       await conn.query(
@@ -83,5 +83,26 @@ export default async function playerRoutes(fastify) {
     } finally {
       conn.release()
     }
+  })
+
+  // POST /api/player/hack-access — record a successful hack; creates machine_access row
+  fastify.post('/api/player/hack-access', { preHandler: requireAuth }, async (req, reply) => {
+    const { playerId } = req.player
+    const { hostname } = req.body || {}
+    if (!hostname) return reply.code(400).send({ error: 'hostname required' })
+
+    const [[machine]] = await db.query(
+      'SELECT id FROM machines WHERE hostname = ?',
+      [hostname]
+    )
+    if (!machine) return reply.code(404).send({ error: 'unknown target' })
+
+    await db.query(
+      `INSERT IGNORE INTO machine_access (id, machine_id, controller_id, mining_share)
+       VALUES (UUID(), ?, ?, 15.00)`,
+      [machine.id, playerId]
+    )
+
+    return { ok: true }
   })
 }
