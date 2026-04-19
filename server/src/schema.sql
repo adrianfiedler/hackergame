@@ -202,8 +202,3 @@ ON DUPLICATE KEY UPDATE
   puzzle_kind   = VALUES(puzzle_kind),
   hack_reward   = VALUES(hack_reward),
   flavor        = VALUES(flavor);
-
-ALTER TABLE machines ADD COLUMN ram_level INT NOT NULL DEFAULT 1;
-ALTER TABLE machines ADD COLUMN storage_level INT NOT NULL DEFAULT 1;
-ALTER TABLE machines ADD COLUMN cooling_level INT NOT NULL DEFAULT 1;
-ALTER TABLE players ADD COLUMN last_ticked_at DATETIME NULL;
