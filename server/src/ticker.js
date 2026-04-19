@@ -32,8 +32,9 @@ export function startTicker(io, onlinePlayers) {
     if (running) return
     running = true
     try {
-      // Purge expired hack sessions (cheap indexed delete, runs every tick)
+      // Purge expired sessions and access rows (cheap indexed deletes, every tick)
       db.query('DELETE FROM hack_sessions WHERE expires_at < NOW()').catch(() => {})
+      db.query('DELETE FROM machine_access WHERE expires_at IS NOT NULL AND expires_at < NOW()').catch(() => {})
 
       const [[rows], [slaveRows]] = await Promise.all([
         db.query(`
@@ -45,16 +46,18 @@ export function startTicker(io, onlinePlayers) {
         db.query(`
           SELECT ma.controller_id,
                  ma.mining_share,
-                 sm.rig_level, sm.cpu_level, sm.net_level
+                 sm.rig_level, sm.cpu_level, sm.net_level,
+                 sm.tier_hashrate
           FROM machine_access ma
           JOIN machines sm ON sm.id = ma.machine_id
+          WHERE ma.expires_at IS NULL OR ma.expires_at > NOW()
         `),
       ])
 
       // Build map: controller_id → [{slaveHashrate, miningShare}, ...]
       const slaveMap = new Map()
       for (const s of slaveRows) {
-        const slaveHashrate = calcHashrate(s)
+        const slaveHashrate = s.tier_hashrate != null ? s.tier_hashrate : calcHashrate(s)
         const entry = { slaveHashrate, miningShare: Number(s.mining_share) }
         if (!slaveMap.has(s.controller_id)) slaveMap.set(s.controller_id, [])
         slaveMap.get(s.controller_id).push(entry)

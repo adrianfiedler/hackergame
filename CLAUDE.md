@@ -49,19 +49,19 @@ Priority order. Each item is roughly self-contained.
 - Server re-validates the answer, then creates `machine_access` + `hack_log` rows.
 - Reward (⟠) is only credited server-side on confirmed success.
 
-### 4. NPC tier system ✦ CURRENT FOCUS
+### 4. NPC tier system ✅ DONE
 - Replace the 8 hardcoded targets in `terminal.jsx` with a 5-tier procedural NPC table.
 - Tier 1–5: hashrates 20 / 80 / 300 / 1200 / 5000 H/s; access expires 48h / 24h / 12h / 6h / 2h.
 - Tier 4+ uses a new multi-stage (chained) puzzle type.
 - Ticker purges expired NPC `machine_access` rows automatically.
 
-### 5. Firewall / IDS / Purge defense commands
+### 5. Firewall / IDS / Purge defense commands ✅ DONE
 - Add `firewall`, `ids`, `purge` terminal commands backed by server routes.
 - Firewall level (already in `machines.firewall_lvl`) increases hack failure chance.
 - IDS (`ids_active`) notifies victim via Socket.IO when a new `machine_access` row is created.
 - Purge deletes all `machine_access` rows for own machine; costs 2× daily income.
 
-### 6. Tier 2 upgrades (RAM / Storage / Cooling)
+### 6. Tier 2 upgrades (RAM / Storage / Cooling) ✦ CURRENT FOCUS
 - Unlock when Tier 1 average level ≥ 5.
 - RAM: reduces tick interval from 10s → 8s (implement as `efficiency_multiplier` column, not a real interval change; factor = 10/tick_equiv).
 - Storage Array: offline income accumulation up to 3 missed ticks.
