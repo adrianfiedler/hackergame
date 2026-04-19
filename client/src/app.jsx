@@ -272,12 +272,14 @@ export default function App() {
     <>
       {/* Desktop surface */}
       <div
+        id="desktop"
         style={{
           position: 'fixed', inset: '0 0 28px 0', zIndex: 1,
           ...(tweaks.wallpaper ? {
-            backgroundImage: `url(${tweaks.wallpaper})`,
+            backgroundImage: `url("${tweaks.wallpaper}")`,
             backgroundSize: 'cover',
             backgroundPosition: 'center',
+            backgroundRepeat: 'no-repeat',
           } : {}),
         }}
         onClick={onDesktopClick}
