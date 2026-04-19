@@ -259,7 +259,7 @@ export default async function hackRoutes(fastify, io, onlinePlayers) {
     await db.query('UPDATE hack_sessions SET used = 1, attempts = ? WHERE id = ?', [newAttempts, session_id])
 
     const [[machine]] = await db.query(
-      'SELECT hack_reward, tier, firewall_lvl FROM machines WHERE id = ?',
+      'SELECT hack_reward, tier, firewall_lvl, ids_active, owner_id FROM machines WHERE id = ?',
       [session.machine_id]
     )
     if (!machine) return reply.code(500).send({ error: 'target_missing', message: 'Target machine not found.' })
@@ -306,6 +306,18 @@ export default async function hackRoutes(fastify, io, onlinePlayers) {
       throw err
     } finally {
       conn.release()
+    }
+
+    // IDS alert: notify machine owner if IDS is active
+    if (machine.ids_active) {
+      const [[attacker]] = await db.query('SELECT username FROM players WHERE id = ?', [playerId])
+      const ownerSocket  = onlinePlayers.get(machine.owner_id)
+      if (ownerSocket) {
+        io.to(ownerSocket).emit('defense:ids_alert', {
+          attacker: attacker?.username ?? 'unknown',
+          machineId: session.machine_id,
+        })
+      }
     }
 
     return { success: true, complete: true, reward: machine.hack_reward }
