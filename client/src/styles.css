@@ -45,6 +45,7 @@ body[data-theme="amber"]   { --phos: var(--neon-y); }
   overflow: hidden;
 }
 #desktop::before {
+  /* intentional: dot-grid renders over wallpaper for retro CRT aesthetic */
   content: "";
   position: absolute; inset: 0;
   background-image:
@@ -716,6 +717,7 @@ body[data-theme="amber"]   { --phos: var(--neon-y); }
   padding: 6px;
   min-width: 180px;
   font-size: 12px;
+  font-family: "Share Tech Mono", monospace;
 }
 #ctxmenu.open {
   display: block;

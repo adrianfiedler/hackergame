@@ -80,6 +80,10 @@ export default function App() {
       if (raw) saved = JSON.parse(raw)
     } catch {}
     const merged = { ...TWEAK_DEFAULTS, ...saved }
+    if (merged.wallpaper && !WALLPAPERS.includes(merged.wallpaper)) {
+      merged.wallpaper = ''
+      merged.wallpaperFixed = false
+    }
     if (!merged.wallpaperFixed && WALLPAPERS.length > 0) {
       merged.wallpaper = WALLPAPERS[Math.floor(Math.random() * WALLPAPERS.length)]
     }
@@ -294,7 +298,7 @@ export default function App() {
         onClick={onDesktopClick}
         onContextMenu={(e) => {
           e.preventDefault()
-          const MENU_W = 200, MENU_H = 160
+          const MENU_W = 200, MENU_H = 320
           setCtxMenu({
             x: Math.min(e.clientX, window.innerWidth  - MENU_W),
             y: Math.min(e.clientY, window.innerHeight - MENU_H),
@@ -426,6 +430,7 @@ export default function App() {
               <img
                 key={wp}
                 src={wp}
+                alt=""
                 className={'ctxmenu-thumb' + (tweaks.wallpaper === wp ? ' active' : '')}
                 title={wp.split('/').pop()}
                 onClick={() => {
@@ -443,7 +448,7 @@ export default function App() {
               setCtxMenu(null)
             }}
           >
-            ↺ Randomize on login
+            ↺ Randomize now & on login
           </div>
         </div>
       )}
