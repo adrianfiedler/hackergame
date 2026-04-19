@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { Audio, fmtCrypto, STORAGE_KEY } from './state.jsx'
+import { Audio, fmtCrypto, fmtHs, STORAGE_KEY } from './state.jsx'
 
 // ── Hack targets (NPC — player machines come in Phase 2) ─────────────────────
 const HACK_TARGETS = [
@@ -59,7 +59,7 @@ export function Terminal({ state, setState, onOpenApp }) {
       await typeOut('|__/  |__/|__/  |__/ \\______/ |__/  |__/','mag', 0.3)
       push('', '')
       await typeOut('HX//OS 2.4 — Terminal Session 0xDEADBEEF', 'ok')
-      await typeOut(`Welcome back, operator. Hashrate: ${state.hashrate} H/s  Balance: ${fmtCrypto(state.crypto)} ⟠`, 'dim')
+      await typeOut(`Welcome back, operator. Hashrate: ${fmtHs(state.hashrate)} H/s  Balance: ${fmtCrypto(state.crypto)} ⟠`, 'dim')
       push("Type 'help' to list commands.", '')
       push('', '')
     })()
@@ -99,7 +99,7 @@ export function Terminal({ state, setState, onOpenApp }) {
       case 'balance': case 'wallet': {
         const slaveHsW = Math.round((state.slaveEarned ?? 0) * 1000)
         const totalHsW = state.hashrate + slaveHsW
-        const hsDetail = slaveHsW > 0 ? `${totalHsW} H/s (${state.hashrate} local + ${slaveHsW} botnet)` : `${state.hashrate} H/s`
+        const hsDetail = slaveHsW > 0 ? `${fmtHs(totalHsW)} H/s (${fmtHs(state.hashrate)} local + ${fmtHs(slaveHsW)} botnet)` : `${fmtHs(state.hashrate)} H/s`
         return push(`⟠ ${fmtCrypto(state.crypto)}   (hashrate: ${hsDetail})`, 'ok')
       }
       case 'sysinfo': case 'specs': return sysinfo()
@@ -280,10 +280,10 @@ export function Terminal({ state, setState, onOpenApp }) {
       const lvl      = state[s.col]
       const hs       = Math.round(s.baseHs * Math.pow(s.hsGrowth, lvl - 1))
       const nextCost = s.baseCost * Math.pow(s.costGrowth, lvl - 1)
-      push(`  ${s.label.padEnd(16)} L${String(lvl).padStart(2)}   ${String(hs).padStart(7)} H/s   next: ${fmtCrypto(nextCost)} ⟠`, '')
+      push(`  ${s.label.padEnd(16)} L${String(lvl).padStart(2)}   ${fmtHs(hs).padStart(9)} H/s   next: ${fmtCrypto(nextCost)} ⟠`, '')
     }
-    push(`  ${'Botnet slaves'.padEnd(16)}        ${String(slaveHs).padStart(7)} H/s`, slaveHs > 0 ? 'warn' : 'dim')
-    push(`${'  TOTAL'.padEnd(16)}       ${String(state.hashrate + slaveHs).padStart(7)} H/s`, 'ok')
+    push(`  ${'Botnet slaves'.padEnd(16)}        ${fmtHs(slaveHs).padStart(9)} H/s`, slaveHs > 0 ? 'warn' : 'dim')
+    push(`${'  TOTAL'.padEnd(16)}       ${fmtHs(state.hashrate + slaveHs).padStart(9)} H/s`, 'ok')
     push(`  wallet: ${fmtCrypto(state.crypto)} ⟠`, 'dim')
   }
 
@@ -305,7 +305,7 @@ export function Terminal({ state, setState, onOpenApp }) {
     })
     if (!which) {
       push('─── HARDWARE UPGRADES ─────────────', 'mag')
-      items.forEach(it => push(`  ${it.k.padEnd(5)} L${it.level}  cost ${fmtCrypto(it.cost)} ⟠   +${it.hs} H/s`, ''))
+      items.forEach(it => push(`  ${it.k.padEnd(5)} L${it.level}  cost ${fmtCrypto(it.cost)} ⟠   +${fmtHs(it.hs)} H/s`, ''))
       push('  buy with: upgrade <rig|cpu|net>', 'dim')
       return
     }
@@ -320,7 +320,7 @@ export function Terminal({ state, setState, onOpenApp }) {
       hashrate: s.hashrate + it.hs,
       [it.col]: s[it.col] + 1,
     }))
-    push(`[+] installed ${it.name} L${it.level + 1}. +${it.hs} H/s.`, 'ok')
+    push(`[+] installed ${it.name} L${it.level + 1}. +${fmtHs(it.hs)} H/s.`, 'ok')
     Audio.coin()
 
     fetch('/api/machine/upgrade', {

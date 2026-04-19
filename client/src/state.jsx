@@ -83,6 +83,13 @@ export const Audio = {
 
 // ── Formatting ────────────────────────────────────────────────────────────────
 const SUFFIXES = ['', 'K', 'M', 'B', 'T', 'Qa', 'Qi', 'Sx', 'Sp', 'Oc', 'No', 'Dc']
+function fmtSuffix(n, decimals = 3) {
+  if (!isFinite(n) || isNaN(n)) return '0'
+  if (n < 1000) return String(Math.round(n))
+  const exp   = Math.min(Math.floor(Math.log10(n) / 3), SUFFIXES.length - 1)
+  const value = n / Math.pow(1000, exp)
+  return value.toFixed(decimals) + SUFFIXES[exp]
+}
 export function fmtCrypto(n) {
   if (!isFinite(n) || isNaN(n)) return '0'
   if (n < 1)    return n.toFixed(4)
@@ -90,4 +97,7 @@ export function fmtCrypto(n) {
   const exp   = Math.min(Math.floor(Math.log10(n) / 3), SUFFIXES.length - 1)
   const value = n / Math.pow(1000, exp)
   return value.toFixed(3) + SUFFIXES[exp]
+}
+export function fmtHs(n) {
+  return fmtSuffix(n, 2)
 }

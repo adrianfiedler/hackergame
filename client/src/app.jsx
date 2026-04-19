@@ -3,7 +3,7 @@ import { Win } from './window-manager.jsx'
 import { Terminal } from './terminal.jsx'
 import { Browser, Notepad, Calculator, TrashApp, Miner, IrcApp } from './apps.jsx'
 import { I } from './icons.jsx'
-import { Audio, fmtCrypto, DEFAULT_STATE, saveLocalState, scheduleSyncToServer } from './state.jsx'
+import { Audio, fmtCrypto, fmtHs, DEFAULT_STATE, saveLocalState, scheduleSyncToServer } from './state.jsx'
 import { useAuth } from './auth/AuthContext.jsx'
 import socket from './socket.js'
 
@@ -292,7 +292,7 @@ export default function App() {
         </div>
         <div id="tray">
           <div className="stat"><span className="k">⟠</span><span className="v">{fmtCrypto(state.crypto)}</span></div>
-          <div className="stat"><span className="k">H/s</span><span className="v">{state.hashrate + Math.round((state.slaveEarned ?? 0) * 1000)}</span></div>
+          <div className="stat"><span className="k">H/s</span><span className="v">{fmtHs(state.hashrate + Math.round((state.slaveEarned ?? 0) * 1000))}</span></div>
           <div id="clock" title={fmtDate(clock)}>{fmtClock(clock)} · {fmtDate(clock)}</div>
         </div>
       </div>

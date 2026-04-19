@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { Audio, fmtCrypto } from './state.jsx'
+import { Audio, fmtCrypto, fmtHs } from './state.jsx'
 import { I } from './icons.jsx'
 import socket from './socket.js'
 
@@ -286,9 +286,9 @@ export function Miner({ state }) {
         {synced && <div key={tickCount} style={{ animation: `miner-bar ${TICK_MS}ms linear forwards` }} />}
       </div>
       <div className="stats">
-        <div className="k">local H/s</div><div className="v">{state.hashrate} H/s</div>
-        <div className="k">botnet H/s</div><div className="v">{Math.round((state.slaveEarned ?? 0) * 1000)} H/s</div>
-        <div className="k">total H/s</div><div className="v">{state.hashrate + Math.round((state.slaveEarned ?? 0) * 1000)} H/s</div>
+        <div className="k">local H/s</div><div className="v">{fmtHs(state.hashrate)} H/s</div>
+        <div className="k">botnet H/s</div><div className="v">{fmtHs(Math.round((state.slaveEarned ?? 0) * 1000))} H/s</div>
+        <div className="k">total H/s</div><div className="v">{fmtHs(state.hashrate + Math.round((state.slaveEarned ?? 0) * 1000))} H/s</div>
         <div className="k">blocks hashed</div><div className="v">{blocks}</div>
         <div className="k">wallet</div><div className="v">{fmtCrypto(state.crypto)} ⟠</div>
         <div className="k">status</div><div className="v" style={{color: !synced ? '#f5a623' : running ? 'var(--primary)' : '#6b7aa8'}}>{!synced ? 'CONNECTING...' : running ? 'ONLINE' : 'paused'}</div>
