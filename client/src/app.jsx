@@ -439,22 +439,22 @@ export default function App() {
                 className={'ctxmenu-thumb' + (tweaks.wallpaper === wp ? ' active' : '')}
                 title={wp.split('/').pop()}
                 onClick={() => {
-                  updateTweaks({ wallpaper: wp, wallpaperFixed: true })
+                  updateTweak('wallpaper', wp)
                   setCtxMenu(null)
                 }}
               />
             ))}
           </div>
           <div className="sep" />
-          <div
-            className="ctxmenu-item"
-            onClick={() => {
-              updateTweaks({ wallpaperFixed: false, wallpaper: WALLPAPERS[Math.floor(Math.random() * WALLPAPERS.length)] })
-              setCtxMenu(null)
-            }}
-          >
-            ↺ Randomize now & on login
-          </div>
+          <label className="ctxmenu-item" style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
+            <input
+              type="checkbox"
+              style={{ accentColor: 'var(--phos)' }}
+              checked={tweaks.wallpaperFixed}
+              onChange={(e) => updateTweak('wallpaperFixed', e.target.checked)}
+            />
+            <span>Lock wallpaper</span>
+          </label>
         </div>
       )}
     </>
