@@ -24,6 +24,12 @@ function calcIncome(hashrate) {
 
 const SLAVE_CAP_MULTIPLIER = 5  // max slave income = 5× own income
 
+const RAM_MULT_PER_LEVEL = 0.25
+
+function ramMultiplier(ramLevel) {
+  return 1 + RAM_MULT_PER_LEVEL * ((ramLevel ?? 1) - 1)
+}
+
 // onlinePlayers: Map<playerId, socketId> — injected by index.js
 export function startTicker(io, onlinePlayers) {
   let running = false
@@ -38,8 +44,9 @@ export function startTicker(io, onlinePlayers) {
 
       const [[rows], [slaveRows]] = await Promise.all([
         db.query(`
-          SELECT p.id, p.crypto,
-                 m.rig_level, m.cpu_level, m.net_level
+          SELECT p.id, p.crypto, p.last_ticked_at,
+                 m.rig_level, m.cpu_level, m.net_level,
+                 m.ram_level, m.storage_level
           FROM players p
           JOIN machines m ON m.owner_id = p.id
         `),
@@ -64,30 +71,48 @@ export function startTicker(io, onlinePlayers) {
       }
 
       // Compute new balances and collect socket notifications
-      const updates = []       // [newBalance, playerId]
-      const notifications = [] // { socketId, payload }
+      const updates       = []
+      const notifications = []
+      const tickedIds     = []
 
       for (const row of rows) {
         const hashrate  = calcHashrate(row)
         const ownIncome = calcIncome(hashrate)
 
-        const cap = ownIncome * SLAVE_CAP_MULTIPLIER
+        // RAM: income multiplier
+        const ramMult = ramMultiplier(row.ram_level)
+
+        // Storage: catch-up for missed ticks (server downtime)
+        const storageMax = row.storage_level ?? 1
+        let catchupTicks = 0
+        if (row.last_ticked_at) {
+          const msSinceTick = Date.now() - new Date(row.last_ticked_at).getTime()
+          const missedTicks = Math.floor(msSinceTick / TICK_MS) - 1
+          if (missedTicks > 0) {
+            catchupTicks = Math.min(missedTicks, storageMax)
+          }
+        }
+
+        const ownIncomeWithEffects = ownIncome * ramMult * (1 + catchupTicks)
+
+        const cap = ownIncomeWithEffects * SLAVE_CAP_MULTIPLIER
         let slaveIncome = 0
         for (const { slaveHashrate, miningShare } of (slaveMap.get(row.id) ?? [])) {
           slaveIncome += slaveHashrate * (miningShare / 100) * INCOME_PER_HS_PER_TICK
         }
         slaveIncome = Math.min(slaveIncome, cap)
 
-        const income     = ownIncome + slaveIncome
+        const income     = ownIncomeWithEffects + slaveIncome
         const newBalance = Number(row.crypto) + income
 
         updates.push([row.id, newBalance])
+        tickedIds.push(row.id)
 
         const socketId = onlinePlayers.get(row.id)
         if (socketId) {
           notifications.push({
             socketId,
-            payload: { earned: income, ownEarned: ownIncome, slaveEarned: slaveIncome, newBalance, hashrate },
+            payload: { earned: income, ownEarned: ownIncomeWithEffects, slaveEarned: slaveIncome, newBalance, hashrate, ramMult, catchupTicks },
           })
         }
       }
@@ -100,6 +125,13 @@ export function startTicker(io, onlinePlayers) {
         await db.query(
           `UPDATE players SET crypto = CASE id ${cases} END WHERE id IN (${ids.map(() => '?').join(', ')})`,
           [...params, ...ids]
+        )
+      }
+
+      if (tickedIds.length > 0) {
+        await db.query(
+          `UPDATE players SET last_ticked_at = NOW() WHERE id IN (${tickedIds.map(() => '?').join(', ')})`,
+          tickedIds
         )
       }
 
