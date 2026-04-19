@@ -2,10 +2,16 @@ import db from '../db.js'
 import { requireAuth } from '../auth/jwt.js'
 import { calcHashrate } from '../ticker.js'
 
+// cost(level) = baseCost * growthRate^(level-1)
+// hsComponent(level) = baseHs * hsGrowth^(level-1)
 const UPGRADE_CONFIG = {
-  rig: { column: 'rig_level', hsBonus: 5,  costMultiplier: 0.05 },
-  cpu: { column: 'cpu_level', hsBonus: 10, costMultiplier: 0.08 },
-  net: { column: 'net_level', hsBonus: 25, costMultiplier: 0.12 },
+  rig: { column: 'rig_level', baseHs: 5,  hsGrowth: 1.4, baseCost: 0.05, costGrowth: 1.6 },
+  cpu: { column: 'cpu_level', baseHs: 12, hsGrowth: 1.5, baseCost: 0.12, costGrowth: 1.7 },
+  net: { column: 'net_level', baseHs: 30, hsGrowth: 1.7, baseCost: 0.25, costGrowth: 1.9 },
+}
+
+export function upgradeCost(cfg, currentLevel) {
+  return parseFloat((cfg.baseCost * Math.pow(cfg.costGrowth, currentLevel - 1)).toFixed(6))
 }
 
 export default async function playerRoutes(fastify) {
@@ -43,7 +49,7 @@ export default async function playerRoutes(fastify) {
       )
 
       const currentLevel = machine[cfg.column]
-      const cost = parseFloat((currentLevel * cfg.costMultiplier).toFixed(6))
+      const cost = upgradeCost(cfg, currentLevel)
 
       if (Number(player.crypto) < cost) {
         await conn.rollback()

@@ -3,13 +3,19 @@ import db from './db.js'
 const TICK_MS = 10_000              // 10 seconds
 const INCOME_PER_HS_PER_TICK = 0.001 // ⟠ per H/s per tick
 
+// baseHs * hsGrowth^(level-1) — must mirror UPGRADE_CONFIG in routes/player.js
+const HS_CONFIG = {
+  rig_level: { baseHs: 5,  hsGrowth: 1.4 },
+  cpu_level: { baseHs: 12, hsGrowth: 1.5 },
+  net_level: { baseHs: 30, hsGrowth: 1.7 },
+}
+
 export function calcHashrate(machine) {
-  return (
-    1 +
-    (machine.rig_level - 1) * 5 +
-    (machine.cpu_level - 1) * 10 +
-    (machine.net_level - 1) * 25
-  )
+  let hs = 1
+  for (const [col, cfg] of Object.entries(HS_CONFIG)) {
+    hs += cfg.baseHs * Math.pow(cfg.hsGrowth, machine[col] - 1)
+  }
+  return Math.round(hs)
 }
 
 function calcIncome(hashrate) {

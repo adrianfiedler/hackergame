@@ -98,6 +98,7 @@ export function Terminal({ state, setState, onOpenApp }) {
         return push('cat: ' + (args[0] || '???') + ': no such file', 'err')
       case 'balance': case 'wallet':
         return push(`⟠ ${fmtCrypto(state.crypto)}   (hashrate: ${state.hashrate} H/s)`, 'ok')
+      case 'sysinfo': case 'specs': return sysinfo()
       case 'scan': case 'nmap':  return scanHosts()
       case 'hack': case 'exploit': return hackHost(args[0])
       case 'mine':
@@ -145,6 +146,7 @@ export function Terminal({ state, setState, onOpenApp }) {
       ['irc',                          'open IRC messenger'],
       ['snake',                        'the classic. highscore wins ⟠'],
       ['upgrade [rig|cpu|net]',        'spend ⟠ on hardware'],
+      ['sysinfo',                      'show rig levels, H/s, and next upgrade costs'],
       ['balance',                      'show wallet'],
       ['browser / notes / calc / trash', 'open GUI apps'],
       ['whoami, ls, cat, date',        'unix classics'],
@@ -257,15 +259,42 @@ export function Terminal({ state, setState, onOpenApp }) {
     }
   }
 
-  const listUpgrades = (which) => {
-    const items = [
-      { k: 'rig', name: 'Mining Rig',    level: state.rigLevel, cost: state.rigLevel * 0.05, effect: '+5 H/s',  col: 'rigLevel', hs: 5  },
-      { k: 'cpu', name: 'Overclock CPU', level: state.cpuLevel, cost: state.cpuLevel * 0.08, effect: '+10 H/s', col: 'cpuLevel', hs: 10 },
-      { k: 'net', name: 'Dark Fiber',    level: state.netLevel, cost: state.netLevel * 0.12, effect: '+25 H/s', col: 'netLevel', hs: 25 },
+  const sysinfo = () => {
+    const SPECS = [
+      { label: 'Mining Rig',    col: 'rigLevel', baseHs: 5,  hsGrowth: 1.4, baseCost: 0.05, costGrowth: 1.6 },
+      { label: 'Overclock CPU', col: 'cpuLevel', baseHs: 12, hsGrowth: 1.5, baseCost: 0.12, costGrowth: 1.7 },
+      { label: 'Dark Fiber',    col: 'netLevel', baseHs: 30, hsGrowth: 1.7, baseCost: 0.25, costGrowth: 1.9 },
     ]
+    push('─── SYSTEM SPECS ───────────────────────', 'mag')
+    for (const s of SPECS) {
+      const lvl     = state[s.col]
+      const hs      = Math.round(s.baseHs * Math.pow(s.hsGrowth, lvl - 1))
+      const nextCost = parseFloat((s.baseCost * Math.pow(s.costGrowth, lvl - 1)).toFixed(6))
+      push(`  ${s.label.padEnd(16)} L${String(lvl).padStart(2)}   ${String(hs).padStart(7)} H/s   next: ${fmtCrypto(nextCost)} ⟠`, '')
+    }
+    push(`${'  TOTAL'.padEnd(16)}       ${String(state.hashrate).padStart(7)} H/s`, 'ok')
+    push(`  wallet: ${fmtCrypto(state.crypto)} ⟠`, 'dim')
+  }
+
+  const UPGRADE_CFG = {
+    rig: { name: 'Mining Rig',    col: 'rigLevel', baseHs: 5,  hsGrowth: 1.4, baseCost: 0.05, costGrowth: 1.6 },
+    cpu: { name: 'Overclock CPU', col: 'cpuLevel', baseHs: 12, hsGrowth: 1.5, baseCost: 0.12, costGrowth: 1.7 },
+    net: { name: 'Dark Fiber',    col: 'netLevel', baseHs: 30, hsGrowth: 1.7, baseCost: 0.25, costGrowth: 1.9 },
+  }
+  const expCost = (cfg, level) => parseFloat((cfg.baseCost * Math.pow(cfg.costGrowth, level - 1)).toFixed(6))
+  const expHs   = (cfg, level) => Math.round(cfg.baseHs * Math.pow(cfg.hsGrowth, level - 1))
+
+  const listUpgrades = (which) => {
+    const items = Object.entries(UPGRADE_CFG).map(([k, cfg]) => {
+      const level = state[cfg.col]
+      const cost  = expCost(cfg, level)
+      const hsNow = expHs(cfg, level)
+      const hsNext = expHs(cfg, level + 1)
+      return { k, name: cfg.name, level, cost, col: cfg.col, hs: hsNext - hsNow, cfg }
+    })
     if (!which) {
       push('─── HARDWARE UPGRADES ─────────────', 'mag')
-      items.forEach(it => push(`  ${it.k.padEnd(5)} L${it.level}  cost ${fmtCrypto(it.cost)} ⟠   ${it.effect}`, ''))
+      items.forEach(it => push(`  ${it.k.padEnd(5)} L${it.level}  cost ${fmtCrypto(it.cost)} ⟠   +${it.hs} H/s`, ''))
       push('  buy with: upgrade <rig|cpu|net>', 'dim')
       return
     }
@@ -280,7 +309,7 @@ export function Terminal({ state, setState, onOpenApp }) {
       hashrate: s.hashrate + it.hs,
       [it.col]: s[it.col] + 1,
     }))
-    push(`[+] installed ${it.name} L${it.level + 1}. ${it.effect}.`, 'ok')
+    push(`[+] installed ${it.name} L${it.level + 1}. +${it.hs} H/s.`, 'ok')
     Audio.coin()
 
     fetch('/api/machine/upgrade', {
