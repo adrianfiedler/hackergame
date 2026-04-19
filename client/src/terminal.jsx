@@ -1,17 +1,9 @@
 import { useState, useEffect, useRef } from 'react'
 import { Audio, fmtCrypto, fmtHs, STORAGE_KEY } from './state.jsx'
+import { useAuth } from './auth/AuthContext.jsx'
 
-// ── Hack targets (display/UI only — puzzle_kind and reward are server-authoritative) ──
-const HACK_TARGETS = [
-  { host: 'gibson.mil',          ip: '10.0.4.7',      difficulty: 1, flavor: 'US Military relay — low-sec gateway.'         },
-  { host: 'mainframe.ellingson', ip: '198.51.100.23', difficulty: 2, flavor: 'Ellingson Mineral Co. — rainbow books onsite.' },
-  { host: 'gateway.globalnet',   ip: '203.0.113.8',   difficulty: 2, flavor: 'Tokyo uplink. Try not to trip the ICE.'        },
-  { host: 'darkstar.corp',       ip: '172.16.9.42',   difficulty: 3, flavor: 'Corporate mainframe. Heavy firewall.'          },
-  { host: 'nsa.gov.ghost',       ip: '192.0.2.99',    difficulty: 4, flavor: '⚠ THREE LETTER AGENCY — trace enabled'         },
-  { host: 'orbital.sat-7',       ip: '198.18.7.7',    difficulty: 3, flavor: 'Low-orbit sat uplink. Window: 90 seconds.'     },
-  { host: 'atm-central.bnk',     ip: '10.10.10.10',   difficulty: 2, flavor: 'First National ATM switch.'                   },
-  { host: 'phreak.pbx.7734',     ip: '64.64.64.64',   difficulty: 1, flavor: 'Old PBX. Tone-dial still works.'               },
-]
+const STAGE_NAMES = { portscan: 'PORT SCAN', password: 'CRACKING PASSWORD', cipher: 'DECRYPTION' }
+const TYPE_LABELS  = { portscan: 'port', password: 'pass', cipher: 'crypt', chained: 'CHAIN' }
 
 function TermLine({ text, cls }) {
   return <div className={'term-line ' + (cls || '')}>{text}</div>
@@ -26,6 +18,7 @@ export function Terminal({ state, setState, onOpenApp }) {
   const [busy, setBusy]     = useState(false)
   const bodyRef  = useRef(null)
   const inputRef = useRef(null)
+  const { machine, setMachine } = useAuth()
 
   const push = (text, cls) => setLines(ls => [...ls, { text, cls, id: Math.random() }])
   const typeOut = async (text, cls, speedMul = 1) => {
@@ -78,6 +71,16 @@ export function Terminal({ state, setState, onOpenApp }) {
     setBusy(false)
   }
 
+  const FIREWALL_BASE_COST   = 0.10
+  const FIREWALL_COST_GROWTH = 2.0
+  const FIREWALL_MAX_LEVEL   = 5
+  const INCOME_PER_HS_TICK   = 0.001
+  const TICKS_PER_DAY        = 8640
+
+  const firewallCost    = (lvl) => FIREWALL_BASE_COST * Math.pow(FIREWALL_COST_GROWTH, lvl - 1)
+  const firewallChance  = (lvl) => ((lvl - 1) * 15) + '%'
+  const calcDailyIncome = (hs)  => hs * INCOME_PER_HS_TICK * TICKS_PER_DAY
+
   const dispatch = async (c, args) => {
     switch (c) {
       case 'help':  return help()
@@ -97,7 +100,9 @@ export function Terminal({ state, setState, onOpenApp }) {
       }
       case 'sysinfo': case 'specs': return sysinfo()
       case 'scan': case 'nmap':  return scanHosts()
-      case 'hack': case 'exploit': return hackHost(args[0])
+      case 'hack': case 'exploit':
+        if (!args[0]) return push("hack: hostname required. try 'scan' first.", 'err')
+        return hackHost(args[0])
       case 'mine':
         onOpenApp('miner'); return push('> launching miner.app…', 'ok')
       case 'snake': return playSnake()
@@ -130,6 +135,9 @@ export function Terminal({ state, setState, onOpenApp }) {
         return
       case 'matrix': return matrix()
       case 'coffee': return push('☕ nothing happens. but you feel more alert.', 'ok')
+      case 'firewall': return defenseFirewall(args[0])
+      case 'ids':      return defenseIds()
+      case 'purge':    return defensePurge()
       default: return push(`bash: ${c}: command not found. try 'help'`, 'err')
     }
   }
@@ -150,6 +158,9 @@ export function Terminal({ state, setState, onOpenApp }) {
       ['matrix',                       '…follow the white rabbit'],
       ['clear',                        'clear screen'],
       ['reset',                        'wipe saved progress'],
+      ['firewall [upgrade]',           'upgrade firewall (blocks incoming hacks)'],
+      ['ids',                          'toggle intrusion detection system'],
+      ['purge',                        'evict all botnet intruders (costs 2× daily income)'],
     ]
     push('─── AVAILABLE COMMANDS ─────────────────────', 'mag')
     cmds.forEach(([c, d]) => push(`  ${c.padEnd(26)} ${d}`, ''))
@@ -157,71 +168,112 @@ export function Terminal({ state, setState, onOpenApp }) {
   }
 
   const scanHosts = async () => {
-    await typeOut('Running TCP SYN scan across known subnets...', 'dim')
-    await sleep(220)
-    await typeOut('╔════════════════════════════════════════════════╗', 'mag', 0.2)
-    await typeOut('║  HOST                  IP              SEC    ║', 'mag', 0.2)
-    await typeOut('╠════════════════════════════════════════════════╣', 'mag', 0.2)
-    for (const t of HACK_TARGETS) {
-      const sec = '▰'.repeat(t.difficulty) + '▱'.repeat(5 - t.difficulty)
-      const tag = state.hackedHosts.includes(t.host) ? ' [OWNED]' : ''
-      const line = `║  ${t.host.padEnd(21)} ${t.ip.padEnd(15)} ${sec}${tag}`
-      await typeOut(line.padEnd(49) + '║', state.hackedHosts.includes(t.host) ? 'ok' : '', 0.2)
+    await typeOut('Querying network topology…', 'dim')
+    let targets
+    try {
+      const r = await fetch('/api/hack/targets', { credentials: 'include' })
+      targets = await r.json()
+      if (!r.ok || !Array.isArray(targets)) return push('[ERR] Scan failed — server error.', 'err')
+    } catch {
+      return push('[ERR] Network unreachable.', 'err')
     }
-    await typeOut('╚════════════════════════════════════════════════╝', 'mag', 0.2)
-    push('→ use: hack <host>', 'dim')
+
+    const fmtStatus = (t) => {
+      if (!t.expires_at) return '-'
+      const ms = new Date(t.expires_at) - Date.now()
+      if (ms <= 0) return '[exp]'
+      const h = Math.floor(ms / 3600000)
+      const m = Math.floor((ms % 3600000) / 60000)
+      return h > 0 ? `[${h}h${String(m).padStart(2,'0')}m]` : `[${m}m]`
+    }
+
+    await typeOut('╔═══════════════════════════════════════════════════════════════╗', 'mag', 0.2)
+    await typeOut('║  HOST                    IP              T   TYPE    STATUS   ║', 'mag', 0.2)
+    await typeOut('╠═══════════════════════════════════════════════════════════════╣', 'mag', 0.2)
+    for (const t of targets) {
+      const status  = fmtStatus(t)
+      const owned   = !!t.expires_at
+      const typeStr = (TYPE_LABELS[t.puzzle_kind] || t.puzzle_kind).padEnd(7)
+      const inner   = `  ${t.hostname.padEnd(25)}${t.ip.padEnd(16)}T${t.tier}  ${typeStr}${status}`
+      await typeOut(inner.padEnd(64) + '║', owned ? 'ok' : '', 0.15)
+    }
+    await typeOut('╚═══════════════════════════════════════════════════════════════╝', 'mag', 0.2)
+    push('→ use: hack <hostname>', 'dim')
   }
 
   const hackHost = async (name) => {
-    const t = HACK_TARGETS.find(x => x.host === name || x.ip === name)
-    if (!t) return push(`hack: unknown host '${name || ''}'. try 'scan'.`, 'err')
-    if (state.hackedHosts.includes(t.host)) return push(`already owned: ${t.host}.`, 'dim')
+    if (!name) return push("hack: hostname required. try 'scan' first.", 'err')
 
-    await typeOut(`[*] Connecting to ${t.host} (${t.ip})…`, 'dim')
+    await typeOut(`[*] Connecting to ${name}…`, 'dim')
     await sleep(300)
-    await typeOut(`[*] ${t.flavor}`, 'mag')
-    await sleep(250)
 
     let startData
     try {
       const r = await fetch('/api/hack/start', {
         method: 'POST', credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ hostname: t.host }),
+        body: JSON.stringify({ hostname: name }),
       })
       startData = await r.json()
       if (!r.ok) {
-        if (startData.error === 'already_owned') return push('[i] Access already established.', 'dim')
+        if (startData.error === 'already_owned')  return push('[i] Access already established.', 'dim')
+        if (startData.error === 'unknown target') return push(`hack: unknown host '${name}'. try 'scan'.`, 'err')
         return push(`[ERR] ${startData.message || startData.error}`, 'err')
       }
     } catch {
       return push('[ERR] Connection timeout.', 'err')
     }
 
-    const { session_id, puzzle_kind, display } = startData
-    let answer
-    if (puzzle_kind === 'portscan')    answer = await renderPortscan(display)
-    else if (puzzle_kind === 'password') answer = await renderPassword(display)
-    else if (puzzle_kind === 'cipher')   answer = await renderCipher(display)
-    else return push('[ERR] Unknown puzzle type.', 'err')
-
-    await typeOut('[*] Transmitting exploit payload…', 'dim')
-
-    let solve
-    try {
-      const r = await fetch('/api/hack/solve', {
-        method: 'POST', credentials: 'include',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ session_id, answer }),
-      })
-      solve = await r.json()
-      if (!r.ok) return push(`[ERR] ${solve.message || solve.error}`, 'err')
-    } catch {
-      return push('[ERR] Connection timeout.', 'err')
+    if (startData.flavor) {
+      await typeOut(`[*] ${startData.flavor}`, 'mag')
+      await sleep(250)
     }
 
-    if (solve.success) await hackSuccess(t, solve.reward)
-    else await hackFail(solve.message)
+    let { session_id, puzzle_kind, display, total_stages } = startData
+    let currentStage = 0
+
+    while (true) {
+      if (total_stages > 1) {
+        await typeOut(`[*] Stage ${currentStage + 1} of ${total_stages}: ${STAGE_NAMES[puzzle_kind] || puzzle_kind.toUpperCase()}…`, 'mag')
+        await sleep(200)
+      }
+
+      let answer
+      if (puzzle_kind === 'portscan')      answer = await renderPortscan(display)
+      else if (puzzle_kind === 'password') answer = await renderPassword(display)
+      else if (puzzle_kind === 'cipher')   answer = await renderCipher(display)
+      else return push('[ERR] Unknown puzzle type.', 'err')
+
+      await typeOut('[*] Transmitting exploit payload…', 'dim')
+
+      let solve
+      try {
+        const r = await fetch('/api/hack/solve', {
+          method: 'POST', credentials: 'include',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ session_id, answer }),
+        })
+        solve = await r.json()
+        if (!r.ok) return push(`[ERR] ${solve.message || solve.error}`, 'err')
+      } catch {
+        return push('[ERR] Connection timeout.', 'err')
+      }
+
+      if (!solve.success) return hackFail(solve.message)
+
+      if (solve.complete === false) {
+        await typeOut(`[✓] Stage ${currentStage + 1} breached. Escalating privileges…`, 'ok')
+        Audio.ok()
+        await sleep(200)
+        puzzle_kind  = solve.puzzle_kind
+        display      = solve.display
+        currentStage = solve.stage
+        continue
+      }
+
+      await hackSuccess(name, solve.reward)
+      break
+    }
   }
 
   const renderPortscan = async (display) => {
@@ -249,11 +301,11 @@ export function Terminal({ state, setState, onOpenApp }) {
     return prompt('plaintext> ')
   }
 
-  const hackSuccess = async (t, reward) => {
-    await typeOut(`[✓] BREACH SUCCESSFUL — ${t.host}`, 'ok')
+  const hackSuccess = async (hostname, reward) => {
+    await typeOut(`[✓] BREACH SUCCESSFUL — ${hostname}`, 'ok')
     Audio.ok()
     await typeOut(`[$] Transferring ${reward.toFixed(4)} ⟠ to wallet…`, 'ok')
-    setState(s => ({ ...s, crypto: s.crypto + reward, hackedHosts: Array.from(new Set([...s.hackedHosts, t.host])) }))
+    setState(s => ({ ...s, crypto: s.crypto + reward, hackedHosts: Array.from(new Set([...s.hackedHosts, hostname])) }))
     await typeOut('[$] Hack the planet. Botnet node registered.', 'mag')
   }
 
@@ -354,6 +406,85 @@ export function Terminal({ state, setState, onOpenApp }) {
       await typeOut(s, 'ok', 0.1)
     }
     push('wake up.', 'mag')
+  }
+
+  const defenseFirewall = async (sub) => {
+    const lvl = machine?.firewall_lvl ?? 1
+    if (!sub) {
+      push('─── FIREWALL STATUS ──────────────────────', 'mag')
+      push(`  Level : ${lvl} / ${FIREWALL_MAX_LEVEL}`, '')
+      push(`  Block : ${firewallChance(lvl)} of incoming hacks`, lvl > 1 ? 'ok' : 'dim')
+      if (lvl < FIREWALL_MAX_LEVEL) {
+        const cost = firewallCost(lvl)
+        push(`  Upgrade cost : ${fmtCrypto(cost)} ⟠  →  use: firewall upgrade`, 'dim')
+      } else {
+        push('  Maximum level reached.', 'ok')
+      }
+      return
+    }
+    if (sub !== 'upgrade') return push("firewall: unknown sub-command. try 'firewall upgrade'", 'err')
+    if (lvl >= FIREWALL_MAX_LEVEL) return push('Firewall already at maximum level.', 'dim')
+
+    const cost = firewallCost(lvl)
+    if (state.crypto < cost) return push(`Insufficient funds. Need ${fmtCrypto(cost)} ⟠.`, 'err')
+
+    await typeOut('[*] Patching firewall ruleset…', 'dim')
+    try {
+      const r = await fetch('/api/machine/defense/firewall', {
+        method: 'POST', credentials: 'include',
+      })
+      const data = await r.json()
+      if (!r.ok) return push(`[ERR] ${data.message || data.error}`, 'err')
+
+      setMachine(m => ({ ...m, firewall_lvl: data.newFirewallLvl }))
+      setState(s => ({ ...s, crypto: data.newCrypto }))
+      push(`[✓] Firewall upgraded to L${data.newFirewallLvl}. Block chance: ${firewallChance(data.newFirewallLvl)}.`, 'ok')
+      Audio.ok()
+    } catch {
+      push('[ERR] Request failed.', 'err')
+    }
+  }
+
+  const defenseIds = async () => {
+    const active = machine?.ids_active ?? false
+    await typeOut(`[*] ${active ? 'Disabling' : 'Enabling'} IDS…`, 'dim')
+    try {
+      const r = await fetch('/api/machine/defense/ids', {
+        method: 'POST', credentials: 'include',
+      })
+      const data = await r.json()
+      if (!r.ok) return push(`[ERR] ${data.message || data.error}`, 'err')
+
+      setMachine(m => ({ ...m, ids_active: data.idsActive }))
+      push(data.idsActive
+        ? '[✓] IDS enabled. You will be alerted when intruders connect.'
+        : '[i] IDS disabled.', data.idsActive ? 'ok' : 'dim')
+    } catch {
+      push('[ERR] Request failed.', 'err')
+    }
+  }
+
+  const defensePurge = async () => {
+    const daily = calcDailyIncome(state.hashrate)
+    const cost  = daily * 2
+    push(`[!] Purge will evict all botnet access from your machine.`, 'warn')
+    push(`    Cost: ${fmtCrypto(cost)} ⟠  (2× daily income).`, 'warn')
+    if (state.crypto < cost) return push(`Insufficient funds. Need ${fmtCrypto(cost)} ⟠.`, 'err')
+
+    await typeOut('[*] Initiating trace and purge sequence…', 'dim')
+    try {
+      const r = await fetch('/api/machine/defense/purge', {
+        method: 'POST', credentials: 'include',
+      })
+      const data = await r.json()
+      if (!r.ok) return push(`[ERR] ${data.message || data.error}`, 'err')
+
+      setState(s => ({ ...s, crypto: data.newCrypto }))
+      push(`[✓] Purge complete. ${data.purgedCount} intruder(s) evicted.`, 'ok')
+      Audio.ok()
+    } catch {
+      push('[ERR] Request failed.', 'err')
+    }
   }
 
   const [snake, setSnake] = useState(null)
