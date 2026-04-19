@@ -5,13 +5,28 @@ import { calcHashrate } from '../ticker.js'
 // cost(level) = baseCost * growthRate^(level-1)
 // hsComponent(level) = baseHs * hsGrowth^(level-1)
 const UPGRADE_CONFIG = {
-  rig: { column: 'rig_level', baseHs: 5,  hsGrowth: 1.4, baseCost: 0.05, costGrowth: 1.6 },
-  cpu: { column: 'cpu_level', baseHs: 12, hsGrowth: 1.5, baseCost: 0.12, costGrowth: 1.7 },
-  net: { column: 'net_level', baseHs: 30, hsGrowth: 1.7, baseCost: 0.25, costGrowth: 1.9 },
+  rig:     { column: 'rig_level',     baseHs: 5,  hsGrowth: 1.4, baseCost: 0.05, costGrowth: 1.6 },
+  cpu:     { column: 'cpu_level',     baseHs: 12, hsGrowth: 1.5, baseCost: 0.12, costGrowth: 1.7 },
+  net:     { column: 'net_level',     baseHs: 30, hsGrowth: 1.7, baseCost: 0.25, costGrowth: 1.9 },
+  ram:     { column: 'ram_level',     baseHs: 0,  hsGrowth: 1.0, baseCost: 0.50, costGrowth: 1.8, tier2: true },
+  storage: { column: 'storage_level', baseHs: 0,  hsGrowth: 1.0, baseCost: 0.80, costGrowth: 2.0, tier2: true },
+  cooling: { column: 'cooling_level', baseHs: 0,  hsGrowth: 1.0, baseCost: 1.00, costGrowth: 2.2, tier2: true },
 }
+
+const TIER2_UNLOCK_AVG = 5
+const COOLING_DISCOUNT = 0.98
 
 export function upgradeCost(cfg, currentLevel) {
   return cfg.baseCost * Math.pow(cfg.costGrowth, currentLevel - 1)
+}
+
+export function effectiveCostGrowth(baseCostGrowth, coolingLevel) {
+  return baseCostGrowth * Math.pow(COOLING_DISCOUNT, coolingLevel - 1)
+}
+
+export function upgradeCostWithCooling(cfg, currentLevel, coolingLevel) {
+  const cg = effectiveCostGrowth(cfg.costGrowth, coolingLevel)
+  return cfg.baseCost * Math.pow(cg, currentLevel - 1)
 }
 
 export default async function playerRoutes(fastify) {
@@ -44,12 +59,24 @@ export default async function playerRoutes(fastify) {
         [playerId]
       )
       const [[machine]] = await conn.query(
-        `SELECT rig_level, cpu_level, net_level FROM machines WHERE owner_id = ? FOR UPDATE`,
+        `SELECT rig_level, cpu_level, net_level, ram_level, storage_level, cooling_level FROM machines WHERE owner_id = ? FOR UPDATE`,
         [playerId]
       )
 
       const currentLevel = machine[cfg.column]
-      const cost = upgradeCost(cfg, currentLevel)
+
+      if (cfg.tier2) {
+        const avgTier1 = (machine.rig_level + machine.cpu_level + machine.net_level) / 3
+        if (avgTier1 < TIER2_UNLOCK_AVG) {
+          await conn.rollback()
+          return reply.code(403).send({
+            error: 'tier2_locked',
+            message: `Tier 2 upgrades unlock when average Tier 1 level ≥ ${TIER2_UNLOCK_AVG}. Current avg: ${avgTier1.toFixed(1)}`,
+          })
+        }
+      }
+
+      const cost = upgradeCostWithCooling(cfg, currentLevel, machine.cooling_level)
 
       if (Number(player.crypto) < cost) {
         await conn.rollback()
