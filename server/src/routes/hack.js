@@ -310,13 +310,16 @@ export default async function hackRoutes(fastify, io, onlinePlayers) {
 
     // IDS alert: notify machine owner if IDS is active
     if (machine.ids_active) {
-      const [[attacker]] = await db.query('SELECT username FROM players WHERE id = ?', [playerId])
-      const ownerSocket  = onlinePlayers.get(machine.owner_id)
-      if (ownerSocket) {
-        io.to(ownerSocket).emit('defense:ids_alert', {
-          attacker: attacker?.username ?? 'unknown',
-          machineId: session.machine_id,
-        })
+      try {
+        const ownerSocket = onlinePlayers.get(machine.owner_id)
+        if (ownerSocket) {
+          io.to(ownerSocket).emit('defense:ids_alert', {
+            attacker: req.player.username ?? 'unknown',
+            machineId: session.machine_id,
+          })
+        }
+      } catch (err) {
+        console.error('[IDS] alert failed, suppressing:', err.message)
       }
     }
 
