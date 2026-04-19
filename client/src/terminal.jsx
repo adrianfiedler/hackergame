@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { Audio, fmtCrypto, fmtHs, STORAGE_KEY } from './state.jsx'
 import { useAuth } from './auth/AuthContext.jsx'
+import socket from './socket.js'
 
 const STAGE_NAMES = { portscan: 'PORT SCAN', password: 'CRACKING PASSWORD', cipher: 'DECRYPTION' }
 const TYPE_LABELS  = { portscan: 'port', password: 'pass', cipher: 'crypt', chained: 'CHAIN' }
@@ -66,6 +67,15 @@ export function Terminal({ state, setState, onOpenApp }) {
   useEffect(() => {
     if (bodyRef.current) bodyRef.current.scrollTop = bodyRef.current.scrollHeight
   }, [lines])
+
+  useEffect(() => {
+    const handler = ({ attacker }) => {
+      push(`[!] IDS ALERT: ${attacker} has established access to your machine!`, 'err')
+      Audio.err()
+    }
+    socket.on('defense:ids_alert', handler)
+    return () => socket.off('defense:ids_alert', handler)
+  }, [])
 
   const sleep = (ms) => new Promise(r => setTimeout(r, ms))
 
