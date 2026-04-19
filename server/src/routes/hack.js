@@ -7,6 +7,7 @@ const CIPHER_PHRASES = ['THE MEDIUM IS THE MESSAGE','HACK THE PLANET','MESS WITH
 const PORT_POOL      = [21,22,23,25,80,110,143,443,445,1337,3389,8080,31337]
 const PORT_SVC       = {21:'ftp',22:'ssh',23:'telnet',25:'smtp',80:'http',110:'pop3',143:'imap',443:'https',445:'smb',1337:'elite',3389:'rdp',8080:'http-alt',31337:'backdoor'}
 const MAX_ATTEMPTS   = 3
+const FIREWALL_FAIL_RATE = 0.15  // per level above 1
 
 // Hours of machine_access granted per tier; tier 0 = player machine (no expiry)
 const TIER_EXPIRY_HOURS = { 1: 48, 2: 24, 3: 12, 4: 6, 5: 2 }
@@ -257,7 +258,25 @@ export default async function hackRoutes(fastify, io, onlinePlayers) {
     // Mark session consumed before the transaction (prevents race replay)
     await db.query('UPDATE hack_sessions SET used = 1, attempts = ? WHERE id = ?', [newAttempts, session_id])
 
-    const [[machine]] = await db.query('SELECT hack_reward, tier FROM machines WHERE id = ?', [session.machine_id])
+    const [[machine]] = await db.query(
+      'SELECT hack_reward, tier, firewall_lvl, owner_id FROM machines WHERE id = ?',
+      [session.machine_id]
+    )
+
+    // Firewall roll — session already consumed so client can't replay on a blocked attempt
+    const failChance = (machine.firewall_lvl - 1) * FIREWALL_FAIL_RATE
+    if (failChance > 0 && Math.random() < failChance) {
+      await db.query(
+        'INSERT INTO hack_log (id, attacker_id, target_id, puzzle_kind, success, reward) VALUES (UUID(), ?, ?, ?, 0, 0)',
+        [playerId, session.machine_id, session.puzzle_kind]
+      )
+      return {
+        success: false,
+        attemptsLeft: 0,
+        message: `Firewall L${machine.firewall_lvl} blocked the intrusion. Connection severed.`,
+      }
+    }
+
     const expiryHours = TIER_EXPIRY_HOURS[machine.tier] ?? null
 
     const conn = await db.getConnection()
