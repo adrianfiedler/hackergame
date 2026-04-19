@@ -16,17 +16,9 @@ const UPGRADE_CONFIG = {
 const TIER2_UNLOCK_AVG = 5
 const COOLING_DISCOUNT = 0.98
 
-export function upgradeCost(cfg, currentLevel) {
-  return cfg.baseCost * Math.pow(cfg.costGrowth, currentLevel - 1)
-}
-
-export function effectiveCostGrowth(baseCostGrowth, coolingLevel) {
-  return baseCostGrowth * Math.pow(COOLING_DISCOUNT, coolingLevel - 1)
-}
-
 export function upgradeCostWithCooling(cfg, currentLevel, coolingLevel) {
-  const cg = effectiveCostGrowth(cfg.costGrowth, coolingLevel)
-  return cfg.baseCost * Math.pow(cg, currentLevel - 1)
+  const base = cfg.baseCost * Math.pow(cfg.costGrowth, currentLevel - 1)
+  return base * Math.pow(COOLING_DISCOUNT, coolingLevel - 1)
 }
 
 export default async function playerRoutes(fastify) {
@@ -85,6 +77,7 @@ export default async function playerRoutes(fastify) {
 
       const newLevel   = currentLevel + 1
       const newCrypto  = Number(player.crypto) - cost
+      // tier2 upgrades don't affect hashrate; value is unchanged but included for client consistency
       const newHashrate = calcHashrate({ ...machine, [cfg.column]: newLevel })
 
       await conn.query(
