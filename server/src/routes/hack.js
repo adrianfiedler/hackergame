@@ -259,9 +259,10 @@ export default async function hackRoutes(fastify, io, onlinePlayers) {
     await db.query('UPDATE hack_sessions SET used = 1, attempts = ? WHERE id = ?', [newAttempts, session_id])
 
     const [[machine]] = await db.query(
-      'SELECT hack_reward, tier, firewall_lvl, owner_id FROM machines WHERE id = ?',
+      'SELECT hack_reward, tier, firewall_lvl FROM machines WHERE id = ?',
       [session.machine_id]
     )
+    if (!machine) return reply.code(500).send({ error: 'target_missing', message: 'Target machine not found.' })
 
     // Firewall roll — session already consumed so client can't replay on a blocked attempt
     const failChance = (machine.firewall_lvl - 1) * FIREWALL_FAIL_RATE
