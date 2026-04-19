@@ -279,7 +279,7 @@ export function Terminal({ state, setState, onOpenApp }) {
     for (const s of SPECS) {
       const lvl      = state[s.col]
       const hs       = Math.round(s.baseHs * Math.pow(s.hsGrowth, lvl - 1))
-      const nextCost = parseFloat((s.baseCost * Math.pow(s.costGrowth, lvl - 1)).toFixed(6))
+      const nextCost = s.baseCost * Math.pow(s.costGrowth, lvl - 1)
       push(`  ${s.label.padEnd(16)} L${String(lvl).padStart(2)}   ${String(hs).padStart(7)} H/s   next: ${fmtCrypto(nextCost)} ⟠`, '')
     }
     push(`  ${'Botnet slaves'.padEnd(16)}        ${String(slaveHs).padStart(7)} H/s`, slaveHs > 0 ? 'warn' : 'dim')
@@ -292,7 +292,7 @@ export function Terminal({ state, setState, onOpenApp }) {
     cpu: { name: 'Overclock CPU', col: 'cpuLevel', baseHs: 12, hsGrowth: 1.5, baseCost: 0.12, costGrowth: 1.7 },
     net: { name: 'Dark Fiber',    col: 'netLevel', baseHs: 30, hsGrowth: 1.7, baseCost: 0.25, costGrowth: 1.9 },
   }
-  const expCost = (cfg, level) => parseFloat((cfg.baseCost * Math.pow(cfg.costGrowth, level - 1)).toFixed(6))
+  const expCost = (cfg, level) => cfg.baseCost * Math.pow(cfg.costGrowth, level - 1)
   const expHs   = (cfg, level) => Math.round(cfg.baseHs * Math.pow(cfg.hsGrowth, level - 1))
 
   const listUpgrades = (which) => {
