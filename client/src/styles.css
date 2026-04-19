@@ -611,12 +611,15 @@ body[data-theme="amber"]   { --phos: var(--neon-y); }
 .miner .progress {
   height: 14px; background: #0a0d1a; border: 1px solid var(--neon-c); position: relative; overflow: hidden;
 }
+@keyframes miner-bar {
+  from { width: 0% }
+  to   { width: 100% }
+}
 .miner .progress > div {
   height: 100%;
   background: linear-gradient(90deg, var(--neon-m), var(--neon-c));
   box-shadow: 0 0 8px var(--neon-c);
   width: 0%;
-  transition: width 0.1s linear;
 }
 .miner .stats { display: grid; grid-template-columns: 1fr 1fr; gap: 6px 14px; }
 .miner .stats .k { color: var(--dim); }

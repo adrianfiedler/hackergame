@@ -233,11 +233,12 @@ export function TrashApp({ state, setState }) {
 const TICK_MS = 10_000
 
 export function Miner({ state }) {
-  const [hash, setHash]     = useState('0x00000000000000000000000000000000')
-  const [progress, setProgress] = useState(0)
-  const [running, setRunning]   = useState(true)
-  const [blocks, setBlocks]     = useState(0)
-  const [log, setLog]           = useState([])
+  const [hash, setHash]   = useState('0x00000000000000000000000000000000')
+  const [running, setRunning] = useState(true)
+  const [blocks, setBlocks]   = useState(0)
+  const [log, setLog]         = useState([])
+  const [synced, setSynced]   = useState(false)
+  const [tickCount, setTickCount] = useState(0)
 
   // Hash scramble — purely cosmetic, independent of tick
   useEffect(() => {
@@ -249,24 +250,17 @@ export function Miner({ state }) {
     return () => clearInterval(id)
   }, [running])
 
-  // Anchor ref — updated on each tick without restarting the rAF loop
-  const anchorRef = useRef(Date.now())
-  useEffect(() => {
-    if (state.lastTickAt) anchorRef.current = state.lastTickAt
-  }, [state.lastTickAt])
+  // Ignore tick value that existed before this component mounted.
+  const staleTickRef = useRef(state.lastTickAt)
 
-  // Single persistent rAF loop — reads anchorRef so it never restarts mid-cycle
   useEffect(() => {
-    if (!running) return
-    let raf
-    const step = () => {
-      const elapsed = Date.now() - anchorRef.current
-      setProgress(Math.min((elapsed / TICK_MS) * 100, 100))
-      raf = requestAnimationFrame(step)
-    }
-    raf = requestAnimationFrame(step)
-    return () => cancelAnimationFrame(raf)
-  }, [running])
+    if (!state.lastTickAt || state.lastTickAt === staleTickRef.current) return
+    const elapsed = Date.now() - state.lastTickAt
+    console.log('[Miner] tick — lastTickAt:', state.lastTickAt,
+      '| elapsed since tick:', elapsed + 'ms')
+    setSynced(true)
+    setTickCount(c => c + 1)
+  }, [state.lastTickAt])
 
   // Fire block-found visual on each real server tick
   useEffect(() => {
@@ -284,12 +278,14 @@ export function Miner({ state }) {
         hashing...{'\n'}{hash}{'\n'}
         nonce: {Math.floor(Math.random() * 99999999)}
       </div>
-      <div className="progress"><div style={{ width: progress + '%' }}/></div>
+      <div className="progress">
+        {synced && <div key={tickCount} style={{ animation: `miner-bar ${TICK_MS}ms linear forwards` }} />}
+      </div>
       <div className="stats">
         <div className="k">hashrate</div><div className="v">{state.hashrate} H/s</div>
         <div className="k">blocks hashed</div><div className="v">{blocks}</div>
         <div className="k">wallet</div><div className="v">{fmtCrypto(state.crypto)} ⟠</div>
-        <div className="k">status</div><div className="v" style={{color: running ? 'var(--primary)' : '#6b7aa8'}}>{running ? 'ONLINE' : 'paused'}</div>
+        <div className="k">status</div><div className="v" style={{color: !synced ? '#f5a623' : running ? 'var(--primary)' : '#6b7aa8'}}>{!synced ? 'CONNECTING...' : running ? 'ONLINE' : 'paused'}</div>
       </div>
       <div className="btns">
         <button onClick={() => setRunning(r => !r)}>{running ? '⏸ pause' : '▶ resume'}</button>
