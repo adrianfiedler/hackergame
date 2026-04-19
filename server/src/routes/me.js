@@ -26,6 +26,15 @@ export default async function meRoutes(fastify) {
       ? JSON.parse(player.local_data)
       : (player.local_data || {})
 
+    // Override hackedHosts with the DB-authoritative list from machine_access
+    const [accessRows] = await db.query(
+      `SELECT m.hostname FROM machine_access ma
+       JOIN machines m ON m.id = ma.machine_id
+       WHERE ma.controller_id = ?`,
+      [playerId]
+    )
+    localData.hackedHosts = accessRows.map(r => r.hostname)
+
     return {
       player: {
         id:           player.id,

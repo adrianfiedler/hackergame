@@ -1,24 +1,17 @@
 import { useState, useEffect, useRef } from 'react'
 import { Audio, fmtCrypto, fmtHs, STORAGE_KEY } from './state.jsx'
 
-// ── Hack targets (NPC — player machines come in Phase 2) ─────────────────────
+// ── Hack targets (display/UI only — puzzle_kind and reward are server-authoritative) ──
 const HACK_TARGETS = [
-  { host: 'gibson.mil',          ip: '10.0.4.7',       difficulty: 1, reward: 0.015, flavor: 'US Military relay — low-sec gateway.',           kind: 'portscan' },
-  { host: 'mainframe.ellingson', ip: '198.51.100.23',  difficulty: 2, reward: 0.04,  flavor: 'Ellingson Mineral Co. — rainbow books onsite.',   kind: 'password' },
-  { host: 'gateway.globalnet',   ip: '203.0.113.8',    difficulty: 2, reward: 0.035, flavor: 'Tokyo uplink. Try not to trip the ICE.',           kind: 'cipher'   },
-  { host: 'darkstar.corp',       ip: '172.16.9.42',    difficulty: 3, reward: 0.09,  flavor: 'Corporate mainframe. Heavy firewall.',             kind: 'portscan' },
-  { host: 'nsa.gov.ghost',       ip: '192.0.2.99',     difficulty: 4, reward: 0.22,  flavor: '⚠ THREE LETTER AGENCY — trace enabled',            kind: 'password' },
-  { host: 'orbital.sat-7',       ip: '198.18.7.7',     difficulty: 3, reward: 0.12,  flavor: 'Low-orbit sat uplink. Window: 90 seconds.',        kind: 'cipher'   },
-  { host: 'atm-central.bnk',     ip: '10.10.10.10',    difficulty: 2, reward: 0.055, flavor: 'First National ATM switch.',                       kind: 'password' },
-  { host: 'phreak.pbx.7734',     ip: '64.64.64.64',    difficulty: 1, reward: 0.02,  flavor: 'Old PBX. Tone-dial still works.',                  kind: 'portscan' },
+  { host: 'gibson.mil',          ip: '10.0.4.7',      difficulty: 1, flavor: 'US Military relay — low-sec gateway.'         },
+  { host: 'mainframe.ellingson', ip: '198.51.100.23', difficulty: 2, flavor: 'Ellingson Mineral Co. — rainbow books onsite.' },
+  { host: 'gateway.globalnet',   ip: '203.0.113.8',   difficulty: 2, flavor: 'Tokyo uplink. Try not to trip the ICE.'        },
+  { host: 'darkstar.corp',       ip: '172.16.9.42',   difficulty: 3, flavor: 'Corporate mainframe. Heavy firewall.'          },
+  { host: 'nsa.gov.ghost',       ip: '192.0.2.99',    difficulty: 4, flavor: '⚠ THREE LETTER AGENCY — trace enabled'         },
+  { host: 'orbital.sat-7',       ip: '198.18.7.7',    difficulty: 3, flavor: 'Low-orbit sat uplink. Window: 90 seconds.'     },
+  { host: 'atm-central.bnk',     ip: '10.10.10.10',   difficulty: 2, flavor: 'First National ATM switch.'                   },
+  { host: 'phreak.pbx.7734',     ip: '64.64.64.64',   difficulty: 1, flavor: 'Old PBX. Tone-dial still works.'               },
 ]
-
-const PASSWORDS     = ['godmode','swordfish','hunter2','rosebud','letmein','joshua','orange','trustno1','matrix','neural','megaman','zer0cool','crashoverride','acid','phreak','cyber']
-const CIPHER_PHRASES = ['THE MEDIUM IS THE MESSAGE','HACK THE PLANET','MESS WITH THE BEST','TRUST NO ONE','MIND IS A RAZOR BLADE','RESISTANCE IS FUTILE']
-
-function rot13(s) {
-  return s.replace(/[A-Z]/g, c => String.fromCharCode((c.charCodeAt(0) - 65 + 13) % 26 + 65))
-}
 
 function TermLine({ text, cls }) {
   return <div className={'term-line ' + (cls || '')}>{text}</div>
@@ -182,75 +175,92 @@ export function Terminal({ state, setState, onOpenApp }) {
   const hackHost = async (name) => {
     const t = HACK_TARGETS.find(x => x.host === name || x.ip === name)
     if (!t) return push(`hack: unknown host '${name || ''}'. try 'scan'.`, 'err')
-    if (state.hackedHosts.includes(t.host)) return push(`already owned: ${t.host}. but you can still try.`, 'dim')
+    if (state.hackedHosts.includes(t.host)) return push(`already owned: ${t.host}.`, 'dim')
+
     await typeOut(`[*] Connecting to ${t.host} (${t.ip})…`, 'dim')
     await sleep(300)
     await typeOut(`[*] ${t.flavor}`, 'mag')
     await sleep(250)
-    if (t.kind === 'portscan') return hackPortscan(t)
-    if (t.kind === 'password') return hackPassword(t)
-    if (t.kind === 'cipher')   return hackCipher(t)
+
+    let startData
+    try {
+      const r = await fetch('/api/hack/start', {
+        method: 'POST', credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ hostname: t.host }),
+      })
+      startData = await r.json()
+      if (!r.ok) {
+        if (startData.error === 'already_owned') return push('[i] Access already established.', 'dim')
+        return push(`[ERR] ${startData.message || startData.error}`, 'err')
+      }
+    } catch {
+      return push('[ERR] Connection timeout.', 'err')
+    }
+
+    const { session_id, puzzle_kind, display } = startData
+    let answer
+    if (puzzle_kind === 'portscan')    answer = await renderPortscan(display)
+    else if (puzzle_kind === 'password') answer = await renderPassword(display)
+    else if (puzzle_kind === 'cipher')   answer = await renderCipher(display)
+    else return push('[ERR] Unknown puzzle type.', 'err')
+
+    await typeOut('[*] Transmitting exploit payload…', 'dim')
+
+    let solve
+    try {
+      const r = await fetch('/api/hack/solve', {
+        method: 'POST', credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ session_id, answer }),
+      })
+      solve = await r.json()
+      if (!r.ok) return push(`[ERR] ${solve.message || solve.error}`, 'err')
+    } catch {
+      return push('[ERR] Connection timeout.', 'err')
+    }
+
+    if (solve.success) await hackSuccess(t, solve.reward)
+    else await hackFail(solve.message)
   }
 
-  const hackPortscan = async (t) => {
-    const pool = [21,22,23,25,80,110,143,443,445,1337,3389,8080,31337]
-    const open = pool.sort(() => Math.random() - 0.5).slice(0, 3 + t.difficulty)
-    for (const p of pool.slice(0, 8 + t.difficulty)) {
-      const isOpen = open.includes(p)
-      const svc = {21:'ftp',22:'ssh',23:'telnet',25:'smtp',80:'http',110:'pop3',143:'imap',443:'https',445:'smb',1337:'elite',3389:'rdp',8080:'http-alt',31337:'backdoor'}[p] || '?'
-      await typeOut(`   ${p}/tcp  ${isOpen ? 'OPEN  ' : 'closed'}  ${svc}`, isOpen ? 'ok' : 'dim', 0.15)
+  const renderPortscan = async (display) => {
+    for (const { port, open, service } of display.ports) {
+      await typeOut(`   ${port}/tcp  ${open ? 'OPEN  ' : 'closed'}  ${service}`, open ? 'ok' : 'dim', 0.15)
       await sleep(40)
     }
-    const target = open[open.length - 1]
     push('[?] Which port do you exploit? (type number)', 'warn')
-    const answer = await prompt('exploit :')
-    if (parseInt(answer) === target) await hackSuccess(t)
-    else await hackFail(t, `wrong port. the backdoor was ${target}/tcp.`)
+    return prompt('exploit :')
   }
 
-  const hackPassword = async (t) => {
-    const real = PASSWORDS[Math.floor(Math.random() * PASSWORDS.length)]
-    const hint = real[0] + '·'.repeat(real.length - 2) + real[real.length - 1]
+  const renderPassword = async (display) => {
     await typeOut('[*] Dictionary attack against admin account…', 'dim')
     await sleep(300)
-    await typeOut(`[!] Fragment recovered from memory dump:  ${hint}`, 'warn')
-    await typeOut(`[!] Length: ${real.length}. Possible words in leaked DB:`, 'warn')
-    const choices = [real, ...PASSWORDS.filter(p => p !== real && p.length >= real.length - 1 && p.length <= real.length + 1).slice(0, 5)]
-      .sort(() => Math.random() - 0.5).slice(0, 5)
-    if (!choices.includes(real)) choices[0] = real
-    choices.forEach((p, i) => push(`   [${i+1}] ${p}`, ''))
-    const answer = await prompt('password> ')
-    if (choices[parseInt(answer) - 1] === real) await hackSuccess(t)
-    else await hackFail(t, `wrong. it was '${real}'.`)
+    await typeOut(`[!] Fragment recovered from memory dump:  ${display.hint}`, 'warn')
+    await typeOut(`[!] Length: ${display.length}. Possible words in leaked DB:`, 'warn')
+    display.choices.forEach((p, i) => push(`   [${i+1}] ${p}`, ''))
+    return prompt('password> ')
   }
 
-  const hackCipher = async (t) => {
-    const phrase  = CIPHER_PHRASES[Math.floor(Math.random() * CIPHER_PHRASES.length)]
-    const encoded = rot13(phrase)
+  const renderCipher = async (display) => {
     await typeOut('[*] Intercepted transmission (ROT-13 suspected):', 'dim')
-    await typeOut(`    ${encoded}`, 'warn')
+    await typeOut(`    ${display.encoded}`, 'warn')
     await typeOut('[?] Decrypt the above phrase.', 'mag')
-    const answer = await prompt('plaintext> ')
-    if (answer.toUpperCase().replace(/[^A-Z ]/g, '') === phrase) await hackSuccess(t)
-    else await hackFail(t, `wrong. it was '${phrase}'.`)
+    return prompt('plaintext> ')
   }
 
-  const hackSuccess = async (t) => {
+  const hackSuccess = async (t, reward) => {
     await typeOut(`[✓] BREACH SUCCESSFUL — ${t.host}`, 'ok')
     Audio.ok()
-    await typeOut(`[$] Transferring ${t.reward.toFixed(4)} ⟠ to wallet…`, 'ok')
-    setState(s => ({ ...s, crypto: s.crypto + t.reward, hackedHosts: Array.from(new Set([...s.hackedHosts, t.host])) }))
-    fetch('/api/player/hack-access', {
-      method: 'POST', credentials: 'include',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ hostname: t.host }),
-    }).catch(() => {})
+    await typeOut(`[$] Transferring ${reward.toFixed(4)} ⟠ to wallet…`, 'ok')
+    setState(s => ({ ...s, crypto: s.crypto + reward, hackedHosts: Array.from(new Set([...s.hackedHosts, t.host])) }))
     await typeOut('[$] Hack the planet. Botnet node registered.', 'mag')
   }
-  const hackFail = async (t, reason) => {
+
+  const hackFail = async (message) => {
     await typeOut('[×] DETECTED. ICE engaged. Disconnecting…', 'err')
     Audio.err()
-    await typeOut(`    ${reason}`, 'dim')
+    await typeOut(`    ${message}`, 'dim')
   }
 
   const pendingRef = useRef(null)

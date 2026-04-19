@@ -43,13 +43,13 @@ Priority order. Each item is roughly self-contained.
 - NPC machines seeded in schema.sql; `POST /api/player/hack-access` creates machine_access on hack success.
 - Client displays local H/s, botnet H/s, and total H/s in miner app, `sysinfo`, `wallet`, and tray.
 
-### 3. Server-side hack validation ✦ CURRENT FOCUS
+### 3. Server-side hack validation ✅ DONE
 - Move puzzle outcome from client-trust to a server-verified flow.
 - Client sends puzzle answer to a new `POST /api/hack/solve` endpoint.
 - Server re-validates the answer, then creates `machine_access` + `hack_log` rows.
 - Reward (⟠) is only credited server-side on confirmed success.
 
-### 4. NPC tier system
+### 4. NPC tier system ✦ CURRENT FOCUS
 - Replace the 8 hardcoded targets in `terminal.jsx` with a 5-tier procedural NPC table.
 - Tier 1–5: hashrates 20 / 80 / 300 / 1200 / 5000 H/s; access expires 48h / 24h / 12h / 6h / 2h.
 - Tier 4+ uses a new multi-stage (chained) puzzle type.

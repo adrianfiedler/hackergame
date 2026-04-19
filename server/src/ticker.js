@@ -32,6 +32,9 @@ export function startTicker(io, onlinePlayers) {
     if (running) return
     running = true
     try {
+      // Purge expired hack sessions (cheap indexed delete, runs every tick)
+      db.query('DELETE FROM hack_sessions WHERE expires_at < NOW()').catch(() => {})
+
       const [[rows], [slaveRows]] = await Promise.all([
         db.query(`
           SELECT p.id, p.crypto,

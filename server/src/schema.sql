@@ -30,11 +30,32 @@ CREATE TABLE IF NOT EXISTS machines (
   ids_active    TINYINT(1) NOT NULL DEFAULT 0,
   honeypot_on   TINYINT(1) NOT NULL DEFAULT 0,
   is_online     TINYINT(1) NOT NULL DEFAULT 1,
+  puzzle_kind   VARCHAR(20) NOT NULL DEFAULT 'portscan',
+  hack_reward   DOUBLE NOT NULL DEFAULT 0.02,
   created_at    DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (id),
   UNIQUE KEY uq_hostname (hostname),
   UNIQUE KEY uq_ip (ip_address),
   CONSTRAINT fk_machine_owner FOREIGN KEY (owner_id) REFERENCES players (id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- In-progress hack puzzle sessions (server-generated, expire in 5 min)
+CREATE TABLE IF NOT EXISTS hack_sessions (
+  id          CHAR(36) NOT NULL,
+  player_id   CHAR(36) NOT NULL,
+  machine_id  CHAR(36) NOT NULL,
+  puzzle_kind VARCHAR(20) NOT NULL,
+  answer      VARCHAR(128) NOT NULL,
+  puzzle_data JSON NULL,
+  attempts    TINYINT NOT NULL DEFAULT 0,
+  expires_at  DATETIME NOT NULL,
+  used        TINYINT(1) NOT NULL DEFAULT 0,
+  created_at  DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  UNIQUE KEY uq_hs_player_machine (player_id, machine_id),
+  KEY idx_hs_expires (expires_at),
+  CONSTRAINT fk_hs_player  FOREIGN KEY (player_id)  REFERENCES players (id) ON DELETE CASCADE,
+  CONSTRAINT fk_hs_machine FOREIGN KEY (machine_id) REFERENCES machines (id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 -- Who has remote access on whose machine (post-hack)
@@ -134,12 +155,13 @@ INSERT IGNORE INTO players (id, google_id, username, wallet_addr, grace_ends_at)
   ('00000000-0000-0000-0000-000000000001', 'npc_system', '[NPC]', '0x0000000000000000000000000000000000000001', '2099-01-01 00:00:00');
 
 -- NPC machines — difficulty maps to upgrade levels (1→1, 2→2, 3→3, 4→4)
-INSERT IGNORE INTO machines (id, owner_id, hostname, ip_address, rig_level, cpu_level, net_level) VALUES
-  ('00000000-0000-0000-0002-000000000001', '00000000-0000-0000-0000-000000000001', 'gibson.mil',          '10.0.4.7',      1, 1, 1),
-  ('00000000-0000-0000-0002-000000000002', '00000000-0000-0000-0000-000000000001', 'mainframe.ellingson', '198.51.100.23', 2, 2, 2),
-  ('00000000-0000-0000-0002-000000000003', '00000000-0000-0000-0000-000000000001', 'gateway.globalnet',   '203.0.113.8',   2, 2, 2),
-  ('00000000-0000-0000-0002-000000000004', '00000000-0000-0000-0000-000000000001', 'darkstar.corp',       '172.16.9.42',   3, 3, 3),
-  ('00000000-0000-0000-0002-000000000005', '00000000-0000-0000-0000-000000000001', 'nsa.gov.ghost',       '192.0.2.99',    4, 4, 4),
-  ('00000000-0000-0000-0002-000000000006', '00000000-0000-0000-0000-000000000001', 'orbital.sat-7',       '198.18.7.7',    3, 3, 3),
-  ('00000000-0000-0000-0002-000000000007', '00000000-0000-0000-0000-000000000001', 'atm-central.bnk',     '10.10.10.10',   2, 2, 2),
-  ('00000000-0000-0000-0002-000000000008', '00000000-0000-0000-0000-000000000001', 'phreak.pbx.7734',     '64.64.64.64',   1, 1, 1);
+-- puzzle_kind and hack_reward mirror client HACK_TARGETS
+INSERT IGNORE INTO machines (id, owner_id, hostname, ip_address, rig_level, cpu_level, net_level, puzzle_kind, hack_reward) VALUES
+  ('00000000-0000-0000-0002-000000000001', '00000000-0000-0000-0000-000000000001', 'gibson.mil',          '10.0.4.7',      1, 1, 1, 'portscan', 0.015),
+  ('00000000-0000-0000-0002-000000000002', '00000000-0000-0000-0000-000000000001', 'mainframe.ellingson', '198.51.100.23', 2, 2, 2, 'password', 0.04),
+  ('00000000-0000-0000-0002-000000000003', '00000000-0000-0000-0000-000000000001', 'gateway.globalnet',   '203.0.113.8',   2, 2, 2, 'cipher',   0.035),
+  ('00000000-0000-0000-0002-000000000004', '00000000-0000-0000-0000-000000000001', 'darkstar.corp',       '172.16.9.42',   3, 3, 3, 'portscan', 0.09),
+  ('00000000-0000-0000-0002-000000000005', '00000000-0000-0000-0000-000000000001', 'nsa.gov.ghost',       '192.0.2.99',    4, 4, 4, 'password', 0.22),
+  ('00000000-0000-0000-0002-000000000006', '00000000-0000-0000-0000-000000000001', 'orbital.sat-7',       '198.18.7.7',    3, 3, 3, 'cipher',   0.12),
+  ('00000000-0000-0000-0002-000000000007', '00000000-0000-0000-0000-000000000001', 'atm-central.bnk',     '10.10.10.10',   2, 2, 2, 'password', 0.055),
+  ('00000000-0000-0000-0002-000000000008', '00000000-0000-0000-0000-000000000001', 'phreak.pbx.7734',     '64.64.64.64',   1, 1, 1, 'portscan', 0.02);

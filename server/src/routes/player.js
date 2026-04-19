@@ -85,24 +85,4 @@ export default async function playerRoutes(fastify) {
     }
   })
 
-  // POST /api/player/hack-access — record a successful hack; creates machine_access row
-  fastify.post('/api/player/hack-access', { preHandler: requireAuth }, async (req, reply) => {
-    const { playerId } = req.player
-    const { hostname } = req.body || {}
-    if (!hostname) return reply.code(400).send({ error: 'hostname required' })
-
-    const [[machine]] = await db.query(
-      'SELECT id FROM machines WHERE hostname = ?',
-      [hostname]
-    )
-    if (!machine) return reply.code(404).send({ error: 'unknown target' })
-
-    await db.query(
-      `INSERT IGNORE INTO machine_access (id, machine_id, controller_id, mining_share)
-       VALUES (UUID(), ?, ?, 15.00)`,
-      [machine.id, playerId]
-    )
-
-    return { ok: true }
-  })
 }

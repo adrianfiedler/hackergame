@@ -16,6 +16,7 @@ import { startTicker } from './ticker.js'
 import authRoutes from './routes/auth.js'
 import meRoutes from './routes/me.js'
 import playerRoutes from './routes/player.js'
+import hackRoutes from './routes/hack.js'
 import db from './db.js'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
@@ -65,6 +66,7 @@ if (existsSync(publicDir)) {
 await fastify.register(authRoutes)
 await fastify.register(meRoutes)
 await fastify.register(playerRoutes)
+await fastify.register(hackRoutes)
 
 // ── Socket.io ─────────────────────────────────────────────────────────────
 const io = new SocketIO(fastify.server, {
