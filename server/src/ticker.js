@@ -73,7 +73,6 @@ export function startTicker(io, onlinePlayers) {
       // Compute new balances and collect socket notifications
       const updates       = []
       const notifications = []
-      const tickedIds     = []
 
       for (const row of rows) {
         const hashrate  = calcHashrate(row)
@@ -83,7 +82,7 @@ export function startTicker(io, onlinePlayers) {
         const ramMult = ramMultiplier(row.ram_level)
 
         // Storage: catch-up for missed ticks (server downtime)
-        const storageMax = row.storage_level ?? 1
+        const storageMax = row.storage_level ?? 0
         let catchupTicks = 0
         if (row.last_ticked_at) {
           const msSinceTick = Date.now() - new Date(row.last_ticked_at).getTime()
@@ -106,7 +105,6 @@ export function startTicker(io, onlinePlayers) {
         const newBalance = Number(row.crypto) + income
 
         updates.push([row.id, newBalance])
-        tickedIds.push(row.id)
 
         const socketId = onlinePlayers.get(row.id)
         if (socketId) {
@@ -117,21 +115,14 @@ export function startTicker(io, onlinePlayers) {
         }
       }
 
-      // Single bulk UPDATE for all players
+      // Single bulk UPDATE for all players (atomic: crypto + last_ticked_at together)
       if (updates.length > 0) {
         const cases  = updates.map(() => 'WHEN ? THEN ?').join(' ')
         const ids    = updates.map(([id]) => id)
         const params = updates.flatMap(([id, bal]) => [id, bal])
         await db.query(
-          `UPDATE players SET crypto = CASE id ${cases} END WHERE id IN (${ids.map(() => '?').join(', ')})`,
+          `UPDATE players SET crypto = CASE id ${cases} END, last_ticked_at = NOW() WHERE id IN (${ids.map(() => '?').join(', ')})`,
           [...params, ...ids]
-        )
-      }
-
-      if (tickedIds.length > 0) {
-        await db.query(
-          `UPDATE players SET last_ticked_at = NOW() WHERE id IN (${tickedIds.map(() => '?').join(', ')})`,
-          tickedIds
         )
       }
 
