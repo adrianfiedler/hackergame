@@ -271,7 +271,17 @@ export default function App() {
   return (
     <>
       {/* Desktop surface */}
-      <div style={{ position: 'fixed', inset: '0 0 28px 0', zIndex: 1 }} onClick={onDesktopClick}>
+      <div
+        style={{
+          position: 'fixed', inset: '0 0 28px 0', zIndex: 1,
+          ...(tweaks.wallpaper ? {
+            backgroundImage: `url(${tweaks.wallpaper})`,
+            backgroundSize: 'cover',
+            backgroundPosition: 'center',
+          } : {}),
+        }}
+        onClick={onDesktopClick}
+      >
         <div className="icon-grid">
           {DESKTOP_ICONS.map(icon => {
             const full = icon.app === 'trash' && state.trashFiles.length > 0
