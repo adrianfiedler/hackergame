@@ -17,6 +17,7 @@ import authRoutes from './routes/auth.js'
 import meRoutes from './routes/me.js'
 import playerRoutes from './routes/player.js'
 import hackRoutes from './routes/hack.js'
+import defenseRoutes from './routes/defense.js'
 import db from './db.js'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
@@ -62,22 +63,21 @@ if (existsSync(publicDir)) {
   fastify.setNotFoundHandler((_req, reply) => reply.sendFile('index.html'))
 }
 
-// ── Routes ────────────────────────────────────────────────────────────────
-await fastify.register(authRoutes)
-await fastify.register(meRoutes)
-await fastify.register(playerRoutes)
-await fastify.register(hackRoutes)
-
-// ── Socket.io ─────────────────────────────────────────────────────────────
+// ── Socket.IO (created early so routes can use io) ────────────────────────
 const io = new SocketIO(fastify.server, {
   cors: {
     origin:      IS_PROD ? false : process.env.CLIENT_ORIGIN,
     credentials: true,
   },
 })
-
-// playerId → socketId (for mining tick delivery)
 const onlinePlayers = new Map()
+
+// ── Routes ────────────────────────────────────────────────────────────────
+await fastify.register(authRoutes)
+await fastify.register(meRoutes)
+await fastify.register(playerRoutes)
+await fastify.register((f, _, done) => { hackRoutes(f, io, onlinePlayers); done() })
+await fastify.register((f, _, done) => { defenseRoutes(f, io, onlinePlayers); done() })
 
 // Channel name → channel_id (seeded in schema.sql)
 const PUBLIC_CHANNEL_IDS = {
