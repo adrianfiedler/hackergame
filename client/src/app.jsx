@@ -8,12 +8,20 @@ import { useAuth } from './auth/AuthContext.jsx'
 import socket from './socket.js'
 
 const TWEAK_DEFAULTS = {
-  theme:            'cyan',
-  scanlineIntensity: 35,
-  typingSpeed:       22,
-  audioOn:           true,
-  bootEnabled:       true,
+  theme:             'cyan',
+  scanlineIntensity:  35,
+  typingSpeed:        22,
+  audioOn:            true,
+  bootEnabled:        true,
+  wallpaper:         '',
+  wallpaperFixed:    false,
 }
+
+const WALLPAPERS = [
+  '/wallpapers/wp_city.jpg',
+  '/wallpapers/wp_matrix.jpg',
+  // add more entries here as you drop files into client/public/wallpapers/
+]
 
 const APPS = {
   terminal:   { title: 'TERMINAL',      size: { w: 640, h: 420 } },
@@ -65,7 +73,18 @@ export default function App() {
   const [selectedIcon, setSelectedIcon] = useState(null)
   const [startOpen, setStartOpen] = useState(false)
   const [tweaksOpen, setTweaksOpen] = useState(false)
-  const [tweaks, setTweaks]       = useState({ ...TWEAK_DEFAULTS })
+  const [tweaks, setTweaks]       = useState(() => {
+    let saved = {}
+    try {
+      const raw = localStorage.getItem('hx-tweaks')
+      if (raw) saved = JSON.parse(raw)
+    } catch {}
+    const merged = { ...TWEAK_DEFAULTS, ...saved }
+    if (!merged.wallpaperFixed && WALLPAPERS.length > 0) {
+      merged.wallpaper = WALLPAPERS[Math.floor(Math.random() * WALLPAPERS.length)]
+    }
+    return merged
+  })
   const [clock, setClock]         = useState(new Date())
   const [trashDrop, setTrashDrop] = useState(false)
   const [deletedAnim, setDeletedAnim] = useState([])
@@ -114,7 +133,11 @@ export default function App() {
   }, [])
 
   const updateTweak = (k, v) => {
-    setTweaks(t => ({ ...t, [k]: v }))
+    setTweaks(t => {
+      const next = { ...t, [k]: v }
+      localStorage.setItem('hx-tweaks', JSON.stringify(next))
+      return next
+    })
     try { window.parent.postMessage({ type: '__edit_mode_set_keys', edits: { [k]: v } }, '*') } catch {}
   }
 
