@@ -6,6 +6,10 @@ import socket from './socket.js'
 const STAGE_NAMES = { portscan: 'PORT SCAN', password: 'CRACKING PASSWORD', cipher: 'DECRYPTION' }
 const TYPE_LABELS  = { portscan: 'port', password: 'pass', cipher: 'crypt', chained: 'CHAIN' }
 
+// Tier 2 constants
+const TIER2_UNLOCK_AVG  = 5
+const COOLING_DISCOUNT  = 0.98
+
 // Defense constants and helpers
 const FIREWALL_BASE_COST   = 0.10
 const FIREWALL_COST_GROWTH = 2.0
@@ -161,7 +165,8 @@ export function Terminal({ state, setState, onOpenApp }) {
       ['mine',                         'launch crypto miner'],
       ['irc',                          'open IRC messenger'],
       ['snake',                        'the classic. highscore wins ⟠'],
-      ['upgrade [rig|cpu|net]',        'spend ⟠ on hardware'],
+      ['upgrade [rig|cpu|net]',        'spend ⟠ on hardware (T1)'],
+      ['upgrade [ram|storage|cooling]','Tier 2 upgrades (unlock: avg T1 ≥ 5)'],
       ['sysinfo',                      'show rig levels, H/s, and next upgrade costs'],
       ['balance',                      'show wallet'],
       ['browser / notes / calc / trash', 'open GUI apps'],
@@ -343,57 +348,105 @@ export function Terminal({ state, setState, onOpenApp }) {
 
   const sysinfo = () => {
     const SPECS = [
-      { label: 'Mining Rig',    col: 'rigLevel', baseHs: 5,  hsGrowth: 1.4, baseCost: 0.05, costGrowth: 1.6 },
-      { label: 'Overclock CPU', col: 'cpuLevel', baseHs: 12, hsGrowth: 1.5, baseCost: 0.12, costGrowth: 1.7 },
-      { label: 'Dark Fiber',    col: 'netLevel', baseHs: 30, hsGrowth: 1.7, baseCost: 0.25, costGrowth: 1.9 },
+      { label: 'Mining Rig',    col: 'rigLevel',  baseHs: 5,  hsGrowth: 1.4, baseCost: 0.05, costGrowth: 1.6 },
+      { label: 'Overclock CPU', col: 'cpuLevel',  baseHs: 12, hsGrowth: 1.5, baseCost: 0.12, costGrowth: 1.7 },
+      { label: 'Dark Fiber',    col: 'netLevel',  baseHs: 30, hsGrowth: 1.7, baseCost: 0.25, costGrowth: 1.9 },
     ]
-    const slaveHs = Math.round((state.slaveEarned ?? 0) * 1000)
+    const slaveHs      = Math.round((state.slaveEarned ?? 0) * 1000)
+    const avgTier1     = (state.rigLevel + state.cpuLevel + state.netLevel) / 3
+    const tier2Unlocked = avgTier1 >= TIER2_UNLOCK_AVG
+    const ramLevel     = state.ramLevel     ?? 1
+    const storageLevel = state.storageLevel ?? 1
+    const coolingLevel = state.coolingLevel ?? 1
+
     push('─── SYSTEM SPECS ───────────────────────', 'mag')
     for (const s of SPECS) {
       const lvl      = state[s.col]
       const hs       = Math.round(s.baseHs * Math.pow(s.hsGrowth, lvl - 1))
-      const nextCost = s.baseCost * Math.pow(s.costGrowth, lvl - 1)
+      const nextCost = expCost(s, lvl, coolingLevel)
       push(`  ${s.label.padEnd(16)} L${String(lvl).padStart(2)}   ${fmtHs(hs).padStart(9)} H/s   next: ${fmtCrypto(nextCost)} ⟠`, '')
     }
     push(`  ${'Botnet slaves'.padEnd(16)}        ${fmtHs(slaveHs).padStart(9)} H/s`, slaveHs > 0 ? 'warn' : 'dim')
     push(`${'  TOTAL'.padEnd(16)}       ${fmtHs(state.hashrate + slaveHs).padStart(9)} H/s`, 'ok')
     push(`  wallet: ${fmtCrypto(state.crypto)} ⟠`, 'dim')
+
+    push('─── TIER 2 MODULES ─────────────────────', tier2Unlocked ? 'mag' : 'dim')
+    if (tier2Unlocked) {
+      const ramMult  = (1 + 0.25 * (ramLevel - 1)).toFixed(2)
+      const costDisc = ((1 - Math.pow(COOLING_DISCOUNT, coolingLevel - 1)) * 100).toFixed(1)
+      push(`  RAM Expansion    L${String(ramLevel).padStart(2)}   income ×${ramMult}`, '')
+      push(`  Storage Array    L${String(storageLevel).padStart(2)}   +${storageLevel} offline tick${storageLevel > 1 ? 's' : ''}`, '')
+      push(`  Cooling Unit     L${String(coolingLevel).padStart(2)}   -${costDisc}% upgrade cost`, '')
+    } else {
+      push(`  [LOCKED] avg T1 ${avgTier1.toFixed(1)} / ${TIER2_UNLOCK_AVG} required`, 'dim')
+    }
   }
 
   const UPGRADE_CFG = {
-    rig: { name: 'Mining Rig',    col: 'rigLevel', baseHs: 5,  hsGrowth: 1.4, baseCost: 0.05, costGrowth: 1.6 },
-    cpu: { name: 'Overclock CPU', col: 'cpuLevel', baseHs: 12, hsGrowth: 1.5, baseCost: 0.12, costGrowth: 1.7 },
-    net: { name: 'Dark Fiber',    col: 'netLevel', baseHs: 30, hsGrowth: 1.7, baseCost: 0.25, costGrowth: 1.9 },
+    rig:     { name: 'Mining Rig',    col: 'rigLevel',     baseHs: 5,  hsGrowth: 1.4, baseCost: 0.05, costGrowth: 1.6 },
+    cpu:     { name: 'Overclock CPU', col: 'cpuLevel',     baseHs: 12, hsGrowth: 1.5, baseCost: 0.12, costGrowth: 1.7 },
+    net:     { name: 'Dark Fiber',    col: 'netLevel',     baseHs: 30, hsGrowth: 1.7, baseCost: 0.25, costGrowth: 1.9 },
+    ram:     { name: 'RAM Expansion', col: 'ramLevel',     baseHs: 0,  hsGrowth: 1.0, baseCost: 0.50, costGrowth: 1.8, tier2: true },
+    storage: { name: 'Storage Array', col: 'storageLevel', baseHs: 0,  hsGrowth: 1.0, baseCost: 0.80, costGrowth: 2.0, tier2: true },
+    cooling: { name: 'Cooling Unit',  col: 'coolingLevel', baseHs: 0,  hsGrowth: 1.0, baseCost: 1.00, costGrowth: 2.2, tier2: true },
   }
-  const expCost = (cfg, level) => cfg.baseCost * Math.pow(cfg.costGrowth, level - 1)
+  const expCost = (cfg, level, coolingLevel = 1) => {
+    const base = cfg.baseCost * Math.pow(cfg.costGrowth, level - 1)
+    return base * Math.pow(COOLING_DISCOUNT, coolingLevel - 1)
+  }
   const expHs   = (cfg, level) => Math.round(cfg.baseHs * Math.pow(cfg.hsGrowth, level - 1))
 
   const listUpgrades = (which) => {
+    const avgTier1 = (state.rigLevel + state.cpuLevel + state.netLevel) / 3
+    const tier2Unlocked = avgTier1 >= TIER2_UNLOCK_AVG
+
     const items = Object.entries(UPGRADE_CFG).map(([k, cfg]) => {
-      const level = state[cfg.col]
-      const cost  = expCost(cfg, level)
-      const hsNow = expHs(cfg, level)
+      const level  = state[cfg.col] ?? 1
+      const cost   = expCost(cfg, level, state.coolingLevel)
+      const hsNow  = expHs(cfg, level)
       const hsNext = expHs(cfg, level + 1)
-      return { k, name: cfg.name, level, cost, col: cfg.col, hs: hsNext - hsNow, cfg }
+      return { k, name: cfg.name, level, cost, col: cfg.col, hs: hsNext - hsNow, cfg, tier2: !!cfg.tier2 }
     })
+
     if (!which) {
-      push('─── HARDWARE UPGRADES ─────────────', 'mag')
-      items.forEach(it => push(`  ${it.k.padEnd(5)} L${it.level}  cost ${fmtCrypto(it.cost)} ⟠   +${fmtHs(it.hs)} H/s`, ''))
-      push('  buy with: upgrade <rig|cpu|net>', 'dim')
+      push('─── TIER 1 HARDWARE ───────────────────────', 'mag')
+      items.filter(it => !it.tier2).forEach(it =>
+        push(`  ${it.k.padEnd(8)} L${it.level}  cost ${fmtCrypto(it.cost)} ⟠   +${fmtHs(it.hs)} H/s`, ''))
+
+      if (tier2Unlocked) {
+        push('─── TIER 2 HARDWARE ── UNLOCKED ───────────', 'ok')
+        items.filter(it => it.tier2).forEach(it => {
+          const coolingLevel = state.coolingLevel ?? 1
+          const effect = it.k === 'ram'
+            ? `×${(1 + 0.25 * it.level).toFixed(2)} income`
+            : it.k === 'storage'
+              ? `+${it.level} offline tick${it.level > 1 ? 's' : ''}`
+              : `-${((1 - Math.pow(COOLING_DISCOUNT, coolingLevel - 1)) * 100).toFixed(1)}% cost`
+          push(`  ${it.k.padEnd(8)} L${it.level}  cost ${fmtCrypto(it.cost)} ⟠   ${effect}`, '')
+        })
+      } else {
+        push(`─── TIER 2 HARDWARE ── LOCKED (avg T1 ${avgTier1.toFixed(1)}/${TIER2_UNLOCK_AVG}) ──`, 'dim')
+        push('  ram / storage / cooling — upgrade T1 to unlock', 'dim')
+      }
+
+      push('  buy with: upgrade <rig|cpu|net|ram|storage|cooling>', 'dim')
       return
     }
+
     const it = items.find(x => x.k === which)
     if (!it) return push('upgrade: unknown part', 'err')
+    if (it.tier2 && !tier2Unlocked) {
+      return push(`[LOCKED] Tier 2 unlocks when avg T1 level ≥ ${TIER2_UNLOCK_AVG}. Current: ${avgTier1.toFixed(1)}`, 'err')
+    }
     if (state.crypto < it.cost) return push(`insufficient funds. need ${fmtCrypto(it.cost)} ⟠.`, 'err')
 
-    // Optimistic local update + server confirmation
     setState(s => ({
       ...s,
       crypto:   s.crypto - it.cost,
       hashrate: s.hashrate + it.hs,
-      [it.col]: s[it.col] + 1,
+      [it.col]: (s[it.col] ?? 1) + 1,
     }))
-    push(`[+] installed ${it.name} L${it.level + 1}. +${fmtHs(it.hs)} H/s.`, 'ok')
+    push(`[+] installed ${it.name} L${it.level + 1}.${it.hs > 0 ? ` +${fmtHs(it.hs)} H/s.` : ''}`, 'ok')
     Audio.coin()
 
     fetch('/api/machine/upgrade', {
@@ -404,7 +457,14 @@ export function Terminal({ state, setState, onOpenApp }) {
       .then(r => r.json())
       .then(data => {
         if (data.ok) {
-          setState(s => ({ ...s, crypto: data.newCrypto, hashrate: data.newHashrate }))
+          const patch = { crypto: data.newCrypto, hashrate: data.newHashrate }
+          if (data.upgrade.kind === 'ram')     patch.ramLevel     = data.upgrade.newLevel
+          if (data.upgrade.kind === 'storage') patch.storageLevel = data.upgrade.newLevel
+          if (data.upgrade.kind === 'cooling') patch.coolingLevel = data.upgrade.newLevel
+          setState(s => ({ ...s, ...patch }))
+        } else if (data.error === 'tier2_locked') {
+          push(`[ERR] ${data.message}`, 'err')
+          setState(s => ({ ...s, crypto: s.crypto + it.cost, [it.col]: (s[it.col] ?? 1) - 1 }))
         }
       })
       .catch(() => {})
