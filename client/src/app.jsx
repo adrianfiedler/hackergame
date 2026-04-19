@@ -89,6 +89,7 @@ export default function App() {
   const [trashDrop, setTrashDrop] = useState(false)
   const [deletedAnim, setDeletedAnim] = useState([])
   const [booting, setBooting]     = useState(tweaks.bootEnabled)
+  const [ctxMenu, setCtxMenu]     = useState(null) // null = closed, {x, y} = open
 
   // Sync local-only fields to server and localStorage on state change
   useEffect(() => {
@@ -245,6 +246,7 @@ export default function App() {
   const onDesktopClick = () => {
     setStartOpen(false)
     setSelectedIcon(null)
+    setCtxMenu(null)
     const ctx = document.getElementById('ctxmenu')
     if (ctx) ctx.classList.remove('open')
   }
@@ -283,6 +285,10 @@ export default function App() {
           } : {}),
         }}
         onClick={onDesktopClick}
+        onContextMenu={(e) => {
+          e.preventDefault()
+          setCtxMenu({ x: e.clientX, y: e.clientY })
+        }}
       >
         <div className="icon-grid">
           {DESKTOP_ICONS.map(icon => {
@@ -394,6 +400,44 @@ export default function App() {
       {deletedAnim.map(a => (
         <div key={a.id} className="trash-deleted-anim" style={{ left: a.x, top: a.y }}>{a.text}</div>
       ))}
+
+      {/* Wallpaper context menu */}
+      {ctxMenu && (
+        <div
+          id="ctxmenu"
+          className="open"
+          style={{ left: ctxMenu.x, top: ctxMenu.y }}
+          onClick={(e) => e.stopPropagation()}
+        >
+          <div className="ctxmenu-title">Wallpaper</div>
+          <div className="ctxmenu-grid">
+            {WALLPAPERS.map(wp => (
+              <img
+                key={wp}
+                src={wp}
+                className={'ctxmenu-thumb' + (tweaks.wallpaper === wp ? ' active' : '')}
+                title={wp.split('/').pop()}
+                onClick={() => {
+                  updateTweak('wallpaper', wp)
+                  updateTweak('wallpaperFixed', true)
+                  setCtxMenu(null)
+                }}
+              />
+            ))}
+          </div>
+          <div className="sep" />
+          <div
+            className="ctxmenu-item"
+            onClick={() => {
+              updateTweak('wallpaperFixed', false)
+              updateTweak('wallpaper', WALLPAPERS[Math.floor(Math.random() * WALLPAPERS.length)])
+              setCtxMenu(null)
+            }}
+          >
+            ↺ Randomize on login
+          </div>
+        </div>
+      )}
     </>
   )
 }
