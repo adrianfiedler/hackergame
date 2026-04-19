@@ -16,7 +16,7 @@ export default async function meRoutes(fastify) {
 
     const [[machine]] = await db.query(
       `SELECT id, hostname, ip_address, rig_level, cpu_level, net_level, firewall_lvl,
-              ids_active, honeypot_on
+              ids_active, honeypot_on, ram_level, storage_level, cooling_level
        FROM machines WHERE owner_id = ?`,
       [playerId]
     )
@@ -51,9 +51,12 @@ export default async function meRoutes(fastify) {
         rig_level:   machine.rig_level,
         cpu_level:   machine.cpu_level,
         net_level:   machine.net_level,
-        firewall_lvl: machine.firewall_lvl,
-        ids_active:  !!machine.ids_active,
-        honeypot_on: !!machine.honeypot_on,
+        firewall_lvl:   machine.firewall_lvl,
+        ids_active:     !!machine.ids_active,
+        honeypot_on:    !!machine.honeypot_on,
+        ram_level:      machine.ram_level,
+        storage_level:  machine.storage_level,
+        cooling_level:  machine.cooling_level,
         hashrate,
       },
       localData,
