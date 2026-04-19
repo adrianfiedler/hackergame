@@ -70,7 +70,7 @@ export function Terminal({ state, setState, onOpenApp }) {
 
   useEffect(() => {
     const handler = ({ attacker }) => {
-      push(`[!] IDS ALERT: ${attacker} has established access to your machine!`, 'err')
+      setLines(ls => [...ls, { text: `[!] IDS ALERT: ${attacker} has established access to your machine!`, cls: 'err', id: Math.random() }])
       Audio.err()
     }
     socket.on('defense:ids_alert', handler)
