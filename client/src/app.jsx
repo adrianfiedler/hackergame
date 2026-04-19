@@ -142,6 +142,15 @@ export default function App() {
     try { window.parent.postMessage({ type: '__edit_mode_set_keys', edits: { [k]: v } }, '*') } catch {}
   }
 
+  const updateTweaks = (patches) => {
+    setTweaks(t => {
+      const next = { ...t, ...patches }
+      localStorage.setItem('hx-tweaks', JSON.stringify(next))
+      return next
+    })
+    try { window.parent.postMessage({ type: '__edit_mode_set_keys', edits: patches }, '*') } catch {}
+  }
+
   // Boot sequence
   useEffect(() => {
     if (!booting) return
@@ -247,8 +256,6 @@ export default function App() {
     setStartOpen(false)
     setSelectedIcon(null)
     setCtxMenu(null)
-    const ctx = document.getElementById('ctxmenu')
-    if (ctx) ctx.classList.remove('open')
   }
 
   const appContent = (win) => {
@@ -287,7 +294,11 @@ export default function App() {
         onClick={onDesktopClick}
         onContextMenu={(e) => {
           e.preventDefault()
-          setCtxMenu({ x: e.clientX, y: e.clientY })
+          const MENU_W = 200, MENU_H = 160
+          setCtxMenu({
+            x: Math.min(e.clientX, window.innerWidth  - MENU_W),
+            y: Math.min(e.clientY, window.innerHeight - MENU_H),
+          })
         }}
       >
         <div className="icon-grid">
@@ -418,8 +429,7 @@ export default function App() {
                 className={'ctxmenu-thumb' + (tweaks.wallpaper === wp ? ' active' : '')}
                 title={wp.split('/').pop()}
                 onClick={() => {
-                  updateTweak('wallpaper', wp)
-                  updateTweak('wallpaperFixed', true)
+                  updateTweaks({ wallpaper: wp, wallpaperFixed: true })
                   setCtxMenu(null)
                 }}
               />
@@ -429,8 +439,7 @@ export default function App() {
           <div
             className="ctxmenu-item"
             onClick={() => {
-              updateTweak('wallpaperFixed', false)
-              updateTweak('wallpaper', WALLPAPERS[Math.floor(Math.random() * WALLPAPERS.length)])
+              updateTweaks({ wallpaperFixed: false, wallpaper: WALLPAPERS[Math.floor(Math.random() * WALLPAPERS.length)] })
               setCtxMenu(null)
             }}
           >
