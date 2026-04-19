@@ -719,6 +719,63 @@ body[data-theme="amber"]   { --phos: var(--neon-y); }
 }
 #ctxmenu .item:hover { background: var(--neon-c); color: #000; }
 
+/* ---- Wallpaper context menu ---- */
+#ctxmenu {
+  display: none;
+  position: fixed;
+  z-index: 8000;
+  background: var(--bg-1);
+  border: 1px solid var(--phos);
+  box-shadow: 0 0 12px rgba(0,0,0,0.6);
+  padding: 6px;
+  min-width: 180px;
+  font-size: 12px;
+}
+#ctxmenu.open {
+  display: block;
+}
+.ctxmenu-title {
+  color: var(--phos);
+  font-size: 10px;
+  letter-spacing: 2px;
+  padding: 2px 4px 6px;
+  text-transform: uppercase;
+}
+.ctxmenu-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  padding: 2px;
+  max-width: 260px;
+}
+.ctxmenu-thumb {
+  width: 76px;
+  height: 48px;
+  object-fit: cover;
+  border: 1px solid var(--dim);
+  cursor: pointer;
+  opacity: 0.7;
+  transition: opacity 0.15s, border-color 0.15s;
+}
+.ctxmenu-thumb:hover {
+  opacity: 1;
+  border-color: var(--phos);
+}
+.ctxmenu-thumb.active {
+  border-color: var(--phos);
+  opacity: 1;
+  box-shadow: 0 0 6px var(--phos);
+}
+.ctxmenu-item {
+  padding: 5px 8px;
+  cursor: pointer;
+  color: var(--fg);
+}
+.ctxmenu-item:hover {
+  background: var(--bg-2);
+  color: var(--phos);
+}
+
 /* ── Login Screen ─────────────────────────────────────────────────────────── */
 .login-screen {
   position: fixed; inset: 0;
@@ -761,4 +818,8 @@ body[data-theme="amber"]   { --phos: var(--neon-y); }
 .login-footer {
   color: var(--dim); font-size: 12px; opacity: 0.5;
 }
-#ctxmenu .sep { height: 1px; background: #1a2040; }
+#ctxmenu .sep {
+  height: 1px;
+  background: var(--grid);
+  margin: 4px 0;
+}
