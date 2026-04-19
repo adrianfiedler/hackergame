@@ -12,6 +12,7 @@ CREATE TABLE IF NOT EXISTS players (
   created_at    DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   grace_ends_at DATETIME NOT NULL,
   last_seen_at  DATETIME NULL,
+  last_ticked_at DATETIME NULL,
   PRIMARY KEY (id),
   UNIQUE KEY uq_google_id (google_id),
   UNIQUE KEY uq_username (username),
@@ -28,6 +29,9 @@ CREATE TABLE IF NOT EXISTS machines (
   net_level     INT NOT NULL DEFAULT 1,
   firewall_lvl  INT NOT NULL DEFAULT 1,
   ids_active    TINYINT(1) NOT NULL DEFAULT 0,
+  ram_level     INT NOT NULL DEFAULT 1,
+  storage_level INT NOT NULL DEFAULT 1,
+  cooling_level INT NOT NULL DEFAULT 1,
   honeypot_on   TINYINT(1) NOT NULL DEFAULT 0,
   is_online     TINYINT(1) NOT NULL DEFAULT 1,
   puzzle_kind   VARCHAR(20) NOT NULL DEFAULT 'portscan',
@@ -198,3 +202,8 @@ ON DUPLICATE KEY UPDATE
   puzzle_kind   = VALUES(puzzle_kind),
   hack_reward   = VALUES(hack_reward),
   flavor        = VALUES(flavor);
+
+ALTER TABLE machines ADD COLUMN ram_level INT NOT NULL DEFAULT 1;
+ALTER TABLE machines ADD COLUMN storage_level INT NOT NULL DEFAULT 1;
+ALTER TABLE machines ADD COLUMN cooling_level INT NOT NULL DEFAULT 1;
+ALTER TABLE players ADD COLUMN last_ticked_at DATETIME NULL;
