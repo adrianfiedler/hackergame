@@ -20,6 +20,11 @@ const TWEAK_DEFAULTS = {
 const WALLPAPERS = [
   '/wallpapers/wp_city.jpg',
   '/wallpapers/wp_matrix.jpg',
+  '/wallpapers/wp_matrix_2.jpg',
+  '/wallpapers/wp_girl.jpg',
+  '/wallpapers/wp_girl.gif',
+  '/wallpapers/wp_girl_2.jpg',
+  '/wallpapers/wp_girl_3.jpg',
   // add more entries here as you drop files into client/public/wallpapers/
 ]
 
