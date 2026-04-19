@@ -5,6 +5,17 @@ import { useAuth } from './auth/AuthContext.jsx'
 const STAGE_NAMES = { portscan: 'PORT SCAN', password: 'CRACKING PASSWORD', cipher: 'DECRYPTION' }
 const TYPE_LABELS  = { portscan: 'port', password: 'pass', cipher: 'crypt', chained: 'CHAIN' }
 
+// Defense constants and helpers
+const FIREWALL_BASE_COST   = 0.10
+const FIREWALL_COST_GROWTH = 2.0
+const FIREWALL_MAX_LEVEL   = 5
+const INCOME_PER_HS_TICK   = 0.001
+const TICKS_PER_DAY        = 8640
+
+const firewallCost    = (lvl) => FIREWALL_BASE_COST * Math.pow(FIREWALL_COST_GROWTH, lvl - 1)
+const firewallChance  = (lvl) => ((lvl - 1) * 15) + '%'
+const calcDailyIncome = (hs)  => hs * INCOME_PER_HS_TICK * TICKS_PER_DAY
+
 function TermLine({ text, cls }) {
   return <div className={'term-line ' + (cls || '')}>{text}</div>
 }
@@ -70,16 +81,6 @@ export function Terminal({ state, setState, onOpenApp }) {
     catch (e) { push('!! error: ' + e.message, 'err') }
     setBusy(false)
   }
-
-  const FIREWALL_BASE_COST   = 0.10
-  const FIREWALL_COST_GROWTH = 2.0
-  const FIREWALL_MAX_LEVEL   = 5
-  const INCOME_PER_HS_TICK   = 0.001
-  const TICKS_PER_DAY        = 8640
-
-  const firewallCost    = (lvl) => FIREWALL_BASE_COST * Math.pow(FIREWALL_COST_GROWTH, lvl - 1)
-  const firewallChance  = (lvl) => ((lvl - 1) * 15) + '%'
-  const calcDailyIncome = (hs)  => hs * INCOME_PER_HS_TICK * TICKS_PER_DAY
 
   const dispatch = async (c, args) => {
     switch (c) {
@@ -470,6 +471,9 @@ export function Terminal({ state, setState, onOpenApp }) {
     push(`[!] Purge will evict all botnet access from your machine.`, 'warn')
     push(`    Cost: ${fmtCrypto(cost)} ⟠  (2× daily income).`, 'warn')
     if (state.crypto < cost) return push(`Insufficient funds. Need ${fmtCrypto(cost)} ⟠.`, 'err')
+
+    const confirm = await prompt('Confirm purge? (yes/no) > ')
+    if (confirm?.trim().toLowerCase() !== 'yes') return push('[i] Purge cancelled.', 'dim')
 
     await typeOut('[*] Initiating trace and purge sequence…', 'dim')
     try {
