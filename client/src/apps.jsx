@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { Audio, fmtCrypto } from './state.jsx'
 import { I } from './icons.jsx'
+import socket from './socket.js'
 
 // ── Browser ───────────────────────────────────────────────────────────────────
 const BBS_POSTS = [
@@ -289,39 +290,63 @@ export function Miner({ state }) {
 // ── IRC Messenger ─────────────────────────────────────────────────────────────
 const PUBLIC_CHANNELS = ['#general', '#trading', '#wanted']
 
+const SEED_MSGS = {
+  '#general': [{ id: 's1', sender: null, content: 'Welcome to #general. Hack the planet.', kind: 'system_alert', ts: new Date() }],
+  '#trading': [{ id: 's2', sender: null, content: 'Trade zero-days, hardware, and exploit kits here.', kind: 'system_alert', ts: new Date() }],
+  '#wanted':  [{ id: 's3', sender: null, content: 'Post bounties on enemy operators. Watch your back.', kind: 'system_alert', ts: new Date() }],
+  'SYSTEM':   [{ id: 's4', sender: null, content: 'System log initialized. Mining income will appear here.', kind: 'system_mine', ts: new Date() }],
+}
+
 export function IrcApp({ player }) {
   const [activeChannel, setActiveChannel] = useState('#general')
-  const [messages, setMessages]           = useState({
-    '#general': [
-      { id: 1, sender: 'SYSTEM', content: 'Welcome to #general. Hack the planet.', kind: 'system_alert', ts: new Date() },
-    ],
-    '#trading': [
-      { id: 2, sender: 'SYSTEM', content: 'Trade zero-days, hardware, and exploit kits here.', kind: 'system_alert', ts: new Date() },
-    ],
-    '#wanted': [
-      { id: 3, sender: 'SYSTEM', content: 'Post bounties on enemy operators. ⚠ Watch your back.', kind: 'system_alert', ts: new Date() },
-    ],
-    'SYSTEM': [
-      { id: 4, sender: null, content: 'System log initialized. Mining income will appear here.', kind: 'system_mine', ts: new Date() },
-    ],
-  })
-  const [input, setInput]   = useState('')
-  const bodyRef = useRef(null)
+  const [messages, setMessages]           = useState(SEED_MSGS)
+  const [input, setInput]                 = useState('')
+  const bodyRef   = useRef(null)
+  const prevCh    = useRef(null)
 
   useEffect(() => {
     if (bodyRef.current) bodyRef.current.scrollTop = bodyRef.current.scrollHeight
   }, [messages, activeChannel])
 
+  // Join/leave socket rooms and load history when channel changes
+  useEffect(() => {
+    if (activeChannel === 'SYSTEM') return
+    if (prevCh.current && prevCh.current !== activeChannel) {
+      socket.emit('irc:leave', prevCh.current)
+    }
+    prevCh.current = activeChannel
+    socket.emit('irc:join', activeChannel)
+  }, [activeChannel])
+
+  // Listen for incoming messages and history
+  useEffect(() => {
+    const onMsg = ({ channel, msg }) => {
+      const ts = msg.ts ? new Date(msg.ts) : new Date()
+      setMessages(m => ({ ...m, [channel]: [...(m[channel] || []), { ...msg, ts }] }))
+    }
+    const onHistory = ({ channel, messages: rows }) => {
+      const hydrated = rows.map(r => ({ ...r, kind: r.msg_kind || r.kind || 'chat', ts: new Date(r.sent_at || r.ts) }))
+      setMessages(m => ({ ...m, [channel]: [...(SEED_MSGS[channel] || []), ...hydrated] }))
+    }
+    socket.on('irc:message', onMsg)
+    socket.on('irc:history', onHistory)
+    return () => {
+      socket.off('irc:message', onMsg)
+      socket.off('irc:history', onHistory)
+    }
+  }, [])
+
   const sendMessage = () => {
-    if (!input.trim()) return
-    const msg = { id: Math.random(), sender: player?.username || 'you', content: input, kind: 'chat', ts: new Date() }
-    setMessages(m => ({ ...m, [activeChannel]: [...(m[activeChannel] || []), msg] }))
+    if (!input.trim() || activeChannel === 'SYSTEM') return
+    socket.emit('irc:message', { channel: activeChannel, content: input.trim() })
     setInput('')
     Audio.key()
-    // TODO Phase 3: emit to socket for real multiplayer chat
   }
 
-  const fmtTime = (d) => `${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`
+  const fmtTime = (d) => {
+    try { return `${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}` }
+    catch { return '--:--' }
+  }
 
   const channelMsgs = messages[activeChannel] || []
 
@@ -340,17 +365,17 @@ export function IrcApp({ player }) {
       <div className="irc-main">
         <div className="irc-messages" ref={bodyRef}>
           {channelMsgs.map(m => (
-            <div key={m.id} className={'irc-msg' + (m.sender === null || m.kind !== 'chat' ? ' irc-sys' : '')}>
+            <div key={m.id} className={'irc-msg' + (m.kind !== 'chat' ? ' irc-sys' : '')}>
               <span className="irc-time">[{fmtTime(m.ts)}]</span>
-              {m.sender && <span className="irc-nick">&lt;{m.sender}&gt;</span>}
-              {!m.sender && <span className="irc-nick irc-sys-tag">[SYS]</span>}
+              {m.sender ? <span className="irc-nick">&lt;{m.sender}&gt;</span>
+                        : <span className="irc-nick irc-sys-tag">[SYS]</span>}
               <span className="irc-content">{m.content}</span>
             </div>
           ))}
         </div>
         {activeChannel !== 'SYSTEM' && (
           <div className="irc-input-row">
-            <span className="irc-prompt">[{activeChannel}]</span>
+            <span className="irc-prompt">[{activeChannel}]&nbsp;&gt;</span>
             <input value={input} onChange={e => setInput(e.target.value)}
               onKeyDown={e => e.key === 'Enter' && sendMessage()}
               placeholder="type message…" autoFocus spellCheck={false} />

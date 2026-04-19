@@ -9,12 +9,14 @@ import { fileURLToPath } from 'url'
 import { join, dirname } from 'path'
 import { existsSync } from 'fs'
 
+import { randomUUID } from 'crypto'
 import { migrate } from './migrate.js'
 import { verifyJwt } from './auth/jwt.js'
 import { startTicker } from './ticker.js'
 import authRoutes from './routes/auth.js'
 import meRoutes from './routes/me.js'
 import playerRoutes from './routes/player.js'
+import db from './db.js'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const PORT = parseInt(process.env.PORT || '3000')
@@ -75,6 +77,13 @@ const io = new SocketIO(fastify.server, {
 // playerId → socketId (for mining tick delivery)
 const onlinePlayers = new Map()
 
+// Channel name → channel_id (seeded in schema.sql)
+const PUBLIC_CHANNEL_IDS = {
+  '#general': '00000000-0000-0000-0001-000000000001',
+  '#trading':  '00000000-0000-0000-0001-000000000002',
+  '#wanted':   '00000000-0000-0000-0001-000000000003',
+}
+
 io.use((socket, next) => {
   const cookieHeader = socket.handshake.headers.cookie || ''
   const cookies = Object.fromEntries(
@@ -103,6 +112,43 @@ io.on('connection', (socket) => {
       onlinePlayers.delete(playerId)
     }
     console.log(`[socket] ${username} disconnected`)
+  })
+
+  // ── IRC ────────────────────────────────────────────────────────────────────
+  socket.on('irc:join', async (channelName) => {
+    const channelId = PUBLIC_CHANNEL_IDS[channelName]
+    if (!channelId) return
+    socket.join(channelName)
+    try {
+      const [rows] = await db.query(
+        `SELECT m.id, m.content, m.msg_kind, m.sent_at,
+                p.username AS sender
+         FROM messages m
+         LEFT JOIN players p ON p.id = m.sender_id
+         WHERE m.channel_id = ?
+         ORDER BY m.sent_at DESC LIMIT 50`,
+        [channelId]
+      )
+      socket.emit('irc:history', { channel: channelName, messages: rows.reverse() })
+    } catch (err) {
+      console.error('[irc:join]', err)
+    }
+  })
+
+  socket.on('irc:message', async ({ channel, content }) => {
+    const channelId = PUBLIC_CHANNEL_IDS[channel]
+    if (!channelId || !content?.trim()) return
+    const id = randomUUID()
+    try {
+      await db.query(
+        `INSERT INTO messages (id, channel_id, sender_id, content, msg_kind) VALUES (?,?,?,?,'chat')`,
+        [id, channelId, playerId, content.trim()]
+      )
+      const msg = { id, sender: username, content: content.trim(), kind: 'chat', ts: new Date() }
+      io.to(channel).emit('irc:message', { channel, msg })
+    } catch (err) {
+      console.error('[irc:message]', err)
+    }
   })
 })
 
