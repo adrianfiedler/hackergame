@@ -264,10 +264,12 @@ export default async function hackRoutes(fastify, io, onlinePlayers) {
     try {
       await conn.beginTransaction()
 
+      const expiresAt = expiryHours
+        ? new Date(Date.now() + expiryHours * 3600 * 1000)
+        : null
       await conn.query(
-        `INSERT IGNORE INTO machine_access (id, machine_id, controller_id, mining_share, expires_at)
-         VALUES (UUID(), ?, ?, 15.00, ${expiryHours ? `DATE_ADD(NOW(), INTERVAL ${expiryHours} HOUR)` : 'NULL'})`,
-        [session.machine_id, playerId]
+        'INSERT IGNORE INTO machine_access (id, machine_id, controller_id, mining_share, expires_at) VALUES (UUID(), ?, ?, 15.00, ?)',
+        [session.machine_id, playerId, expiresAt]
       )
       await conn.query(
         'INSERT INTO hack_log (id, attacker_id, target_id, puzzle_kind, success, reward) VALUES (UUID(), ?, ?, ?, 1, ?)',

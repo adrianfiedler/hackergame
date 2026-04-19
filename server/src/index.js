@@ -76,8 +76,8 @@ const onlinePlayers = new Map()
 await fastify.register(authRoutes)
 await fastify.register(meRoutes)
 await fastify.register(playerRoutes)
-await fastify.register((f, _, done) => { hackRoutes(f, io, onlinePlayers); done() })
-await fastify.register((f, _, done) => { defenseRoutes(f, io, onlinePlayers); done() })
+await fastify.register((f) => hackRoutes(f, io, onlinePlayers))
+await fastify.register((f) => defenseRoutes(f, io, onlinePlayers))
 
 // Channel name → channel_id (seeded in schema.sql)
 const PUBLIC_CHANNEL_IDS = {
