@@ -855,6 +855,8 @@ body[data-theme="amber"]   { --phos: var(--neon-y); }
 .netmap-node.npc { color: var(--neon-y); }
 .netmap-node.selected { border-color: #fff !important; box-shadow: 0 0 12px #fff; z-index: 3; color: #fff; }
 .netmap-node.owned { background: rgba(0, 231, 255, 0.15); border-color: var(--neon-c); }
+.netmap-node.gateway { color: #fff; border-color: #ffffff88; font-weight: bold; box-shadow: 0 0 10px #ffffff44; z-index: 2; }
+.netmap-node.cluster-head { border-color: #2a6a3a; box-shadow: 0 0 6px #1a4a2a; }
 
 .netmap-overlay {
   position: absolute; inset: 0; background: rgba(5, 7, 16, 0.8);

@@ -192,7 +192,7 @@ async function upsertPlayer(profile) {
       'SELECT COUNT(*) as count FROM machines WHERE ip_address LIKE ? AND owner_id = ?',
       [`10.${sector}.${subnet}.%`, NPC_SYSTEM_ID]
     )
-    if (npcCount[0].count === 0) {
+    if (npcCount[0].count < 15) {
       await seedNeighborhoodNPCs(conn, sector, subnet)
     }
 

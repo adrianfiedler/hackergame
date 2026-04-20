@@ -558,6 +558,21 @@ export function NetMap({ onRunCommand }) {
     data.nodes.find(n => n.node_id === i) || null
   )
 
+  const occupiedNodes = grid.filter(Boolean)
+  const gateway = occupiedNodes.reduce((min, n) => (!min || n.node_id < min.node_id ? n : min), null)
+
+  // Two-tier topology: 4 clusters (8×8 quadrants). Cluster head = lowest node_id in block.
+  const clusterOf = id => {
+    const row = Math.floor(id / 16), col = id % 16
+    return Math.floor(row / 8) * 2 + Math.floor(col / 8)
+  }
+  const clusterHeads = {} // clusterId → node with lowest node_id
+  for (const n of occupiedNodes) {
+    const cid = clusterOf(n.node_id)
+    if (!clusterHeads[cid] || n.node_id < clusterHeads[cid].node_id) clusterHeads[cid] = n
+  }
+  const nodePos = id => ({ x: (id % 16) + 0.5, y: Math.floor(id / 16) + 0.5 })
+
   return (
     <div className="netmap">
       <div className="netmap-header">
@@ -577,14 +592,51 @@ export function NetMap({ onRunCommand }) {
               <div className="loading-text">INITIALIZING SUBSURFACE SCAN...</div>
             </div>
           )}
-          <div className="netmap-grid">
+          <div className="netmap-grid" style={{ position: 'relative' }}>
+            {gateway && (
+              <svg
+                style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', pointerEvents: 'none', zIndex: 1 }}
+                viewBox="0 0 16 16"
+                preserveAspectRatio="none"
+              >
+                {/* cluster head → gateway (backbone links) */}
+                {Object.values(clusterHeads).filter(h => h.node_id !== gateway.node_id).map(h => {
+                  const a = nodePos(h.node_id), b = nodePos(gateway.node_id)
+                  const isOwned = h.owned || h.is_self
+                  return (
+                    <line key={`bb-${h.node_id}`}
+                      x1={a.x} y1={a.y} x2={b.x} y2={b.y}
+                      stroke={h.is_self ? 'var(--neon-m)' : isOwned ? 'var(--neon-c)' : '#1a4a2a'}
+                      strokeWidth="0.09"
+                      opacity="0.7"
+                    />
+                  )
+                })}
+                {/* regular nodes → their cluster head (intra-cluster links) */}
+                {occupiedNodes.filter(n => {
+                  const head = clusterHeads[clusterOf(n.node_id)]
+                  return head && n.node_id !== head.node_id
+                }).map(n => {
+                  const head = clusterHeads[clusterOf(n.node_id)]
+                  const a = nodePos(n.node_id), b = nodePos(head.node_id)
+                  return (
+                    <line key={`cl-${n.node_id}`}
+                      x1={a.x} y1={a.y} x2={b.x} y2={b.y}
+                      stroke={n.is_self ? 'var(--neon-m)' : n.owned ? 'var(--neon-c)' : '#112a18'}
+                      strokeWidth="0.05"
+                      opacity="0.5"
+                    />
+                  )
+                })}
+              </svg>
+            )}
             {grid.map((node, i) => (
               <div key={i}
-                className={`netmap-node ${node ? 'occupied' : ''} ${node?.is_self ? 'self' : ''} ${node?.is_npc ? 'npc' : ''} ${selected?.node_id === i ? 'selected' : ''} ${node?.owned ? 'owned' : ''}`}
+                className={`netmap-node ${node ? 'occupied' : ''} ${node?.is_self ? 'self' : ''} ${node?.is_npc ? 'npc' : ''} ${selected?.node_id === i ? 'selected' : ''} ${node?.owned ? 'owned' : ''} ${node?.node_id === gateway?.node_id ? 'gateway' : ''} ${node && clusterHeads[clusterOf(node.node_id)]?.node_id === node.node_id && node.node_id !== gateway?.node_id ? 'cluster-head' : ''}`}
                 onClick={() => node && setSelected(node)}
                 title={node ? `${node.hostname} (${node.ip})` : `10.${data.sector}.${data.subnet}.${i}`}
               >
-                {node ? (node.is_self ? 'Y' : node.is_npc ? 'N' : 'P') : '·'}
+                {node ? (node.node_id === gateway?.node_id ? 'G' : node.is_self ? 'Y' : node.is_npc ? 'N' : 'P') : '·'}
               </div>
             ))}
           </div>
