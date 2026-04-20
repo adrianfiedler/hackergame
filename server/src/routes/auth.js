@@ -47,7 +47,7 @@ async function findUniqueHostname(base) {
 /**
  * Finds a suitable IP in the 10.S.B.N format.
  * Clusters players into subnets.
- * Returns { ip, isNewSubnet, sector, subnet }
+ * Returns { ip, sector, subnet }
  */
 async function allocateHierarchicalIp() {
   // Find latest player-occupied subnet
@@ -74,10 +74,8 @@ async function allocateHierarchicalIp() {
   )
 
   const isFull = countRows[0].count >= 40
-  let isNewSubnet = false
 
-  if (isFull || !latest.length) {
-    isNewSubnet = true
+  if (isFull) {
     subnet++
     if (subnet > 255) {
       subnet = 0
@@ -90,37 +88,61 @@ async function allocateHierarchicalIp() {
     const node = Math.floor(Math.random() * 254) + 1 // 1-254
     const ip = `10.${sector}.${subnet}.${node}`
     const [rows] = await db.query('SELECT id FROM machines WHERE ip_address = ?', [ip])
-    if (!rows.length) return { ip, isNewSubnet, sector, subnet }
+    if (!rows.length) return { ip, sector, subnet }
   }
 
   throw new Error('Failed to find free node in subnet')
 }
 
+const NPC_SYSTEM_ID = '00000000-0000-0000-0000-000000000001'
+
+const NPC_TIERS = [
+  { tier: 1, puzzle: 'portscan', reward: 0.01,  flavor: 'Low-sec workstation. Easy pickings.'              },
+  { tier: 1, puzzle: 'portscan', reward: 0.01,  flavor: 'Misconfigured IoT device. Wide open.'             },
+  { tier: 2, puzzle: 'password', reward: 0.05,  flavor: 'SMB server. Default creds suspected.'             },
+  { tier: 2, puzzle: 'password', reward: 0.05,  flavor: 'FTP host. Brute-force viable.'                    },
+  { tier: 3, puzzle: 'cipher',   reward: 0.20,  flavor: 'Encrypted gateway. Cipher lock active.'           },
+  { tier: 3, puzzle: 'cipher',   reward: 0.20,  flavor: 'Hardened relay node. Needs decryption.'           },
+  { tier: 4, puzzle: 'chained',  reward: 0.80,  flavor: 'Multi-stage intrusion required.'                  },
+  { tier: 5, puzzle: 'chained',  reward: 2.50,  flavor: 'Hardened node. Advanced persistent threat zone.'  },
+]
+
+// Weighted random: tiers 1-2 most common, 4-5 rare
+const NPC_WEIGHTS = [22, 22, 16, 16, 10, 10, 6, 4] // maps to NPC_TIERS indices
+
+function pickNpcTier() {
+  const total = NPC_WEIGHTS.reduce((a, b) => a + b, 0)
+  let r = Math.random() * total
+  for (let i = 0; i < NPC_WEIGHTS.length; i++) {
+    r -= NPC_WEIGHTS[i]
+    if (r <= 0) return NPC_TIERS[i]
+  }
+  return NPC_TIERS[0]
+}
+
 async function seedNeighborhoodNPCs(conn, sector, subnet) {
   const npcCount = 10 + Math.floor(Math.random() * 6) // 10-15 NPCs
-  const NPC_SYSTEM_ID = '00000000-0000-0000-0000-000000000001'
 
   for (let i = 0; i < npcCount; i++) {
-    // Find a free node for each NPC
-    let node = 0
     let ip = ''
     let attempts = 0
     while (attempts < 50) {
-      node = Math.floor(Math.random() * 254) + 1 // 1-254
+      const node = Math.floor(Math.random() * 254) + 1
       ip = `10.${sector}.${subnet}.${node}`
       const [rows] = await conn.query('SELECT id FROM machines WHERE ip_address = ?', [ip])
       if (!rows.length) break
       attempts++
     }
 
-    if (attempts >= 50) continue // Skip if we can't find a spot
+    if (attempts >= 50) continue
 
+    const { tier, puzzle, reward, flavor } = pickNpcTier()
     const hostname = `${ADJECTIVES[Math.floor(Math.random() * ADJECTIVES.length)]}-${NOUNS[Math.floor(Math.random() * NOUNS.length)]}.local`
-    
+
     await conn.query(
       `INSERT IGNORE INTO machines (id, owner_id, hostname, ip_address, tier, puzzle_kind, hack_reward, flavor)
-       VALUES (UUID(), ?, ?, ?, 1, 'portscan', 0.01, ?)`,
-      [NPC_SYSTEM_ID, hostname, ip, 'Local neighborhood node. High latency but low security.']
+       VALUES (UUID(), ?, ?, ?, ?, ?, ?, ?)`,
+      [NPC_SYSTEM_ID, hostname, ip, tier, puzzle, reward, flavor]
     )
   }
 }
@@ -144,7 +166,7 @@ async function upsertPlayer(profile) {
   const username  = await findUniqueUsername(sanitizeUsername(name))
   const wallet    = generateWallet()
   const hostname  = await findUniqueHostname(username)
-  const { ip, isNewSubnet, sector, subnet } = await allocateHierarchicalIp()
+  const { ip, sector, subnet } = await allocateHierarchicalIp()
   const machineId = randomUUID()
 
   // System channel (personal log) for the player
@@ -166,7 +188,11 @@ async function upsertPlayer(profile) {
       [machineId, playerId, hostname, ip]
     )
 
-    if (isNewSubnet) {
+    const [npcCount] = await conn.query(
+      'SELECT COUNT(*) as count FROM machines WHERE ip_address LIKE ? AND owner_id = ?',
+      [`10.${sector}.${subnet}.%`, NPC_SYSTEM_ID]
+    )
+    if (npcCount[0].count === 0) {
       await seedNeighborhoodNPCs(conn, sector, subnet)
     }
 

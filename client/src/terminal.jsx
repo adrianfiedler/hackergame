@@ -51,9 +51,12 @@ export function Terminal({ state, setState, onOpenApp }) {
     }
   }
 
+  const runCmdRef = useRef(null)
+  useEffect(() => { runCmdRef.current = runCmd })
+
   useEffect(() => {
     const onRemoteCmd = (e) => {
-      if (e.detail) runCmd(e.detail)
+      if (e.detail) runCmdRef.current?.(e.detail)
     }
     window.addEventListener('terminal:run', onRemoteCmd)
     return () => window.removeEventListener('terminal:run', onRemoteCmd)

@@ -26,7 +26,7 @@ export default async function gridRoutes(fastify) {
               ma.expires_at AS access_expires
        FROM machines m
        LEFT JOIN players p ON p.id = m.owner_id
-       LEFT JOIN machine_access ma ON ma.machine_id = m.id AND ma.controller_id = ?
+       LEFT JOIN machine_access ma ON ma.machine_id = m.id AND ma.controller_id = ? AND ma.expires_at > NOW()
        WHERE m.ip_address LIKE ?`,
       [playerId, prefix]
     )
