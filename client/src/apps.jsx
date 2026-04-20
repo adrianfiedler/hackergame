@@ -546,6 +546,7 @@ export function NetMap({ onRunCommand }) {
             text: `${(d.operation || '').toUpperCase()} FAILED: ${op?.target_hostname} — connection rejected`,
           }}))
         }
+        setOps(prev => prev.filter(o => o.id !== opId))
         await fetchOps()
         if (selected && !selected.is_self) await fetchOpInfo(selected.hostname)
       }
@@ -628,22 +629,27 @@ export function NetMap({ onRunCommand }) {
                   <div className="nm-op-list">
                     {opInfoLoading && <div className="nm-op-loading">SCANNING TARGET...</div>}
                     {opInfo?.ops.map(op => {
-                      const isRunning  = op.running
-                      const slotFull   = slots.used >= slots.max && !isRunning
-                      const disabled   = isRunning || slotFull || launching === op.type
+                      const cooldownMs  = op.cooldown_until ? op.cooldown_until - now : 0
+                      const onCooldown  = cooldownMs > 0
+                      const isRunning   = op.running
+                      const slotFull    = slots.used >= slots.max && !isRunning
+                      const disabled    = isRunning || slotFull || onCooldown || launching === op.type
                       // scan_ports always shows own rate; others need scan_result first
                       const revealedPct = opInfo.scan_result?.[`${op.type}_success_pct`]
                       const showRate    = op.type === 'scan_ports' || revealedPct != null
                       const displayPct  = op.type === 'scan_ports' ? op.success_pct : revealedPct
                       return (
-                        <div key={op.type} className={`nm-op-row ${isRunning ? 'running' : ''}`}>
+                        <div key={op.type} className={`nm-op-row ${isRunning ? 'running' : ''} ${onCooldown ? 'cooldown' : ''}`}>
                           <div className="nm-op-top">
                             <button
                               className="nm-op-btn"
                               disabled={disabled}
                               onClick={() => launchOp(op.type)}
                             >
-                              {isRunning ? '▶ RUNNING' : launching === op.type ? '...' : op.label}
+                              {isRunning    ? '▶ RUNNING'
+                               : onCooldown ? `⏳ ${fmtDuration(cooldownMs)}`
+                               : launching === op.type ? '...'
+                               : op.label}
                             </button>
                             {showRate ? (
                               <span className="nm-op-success" style={{ color: successColor(displayPct) }}>

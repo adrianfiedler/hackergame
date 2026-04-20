@@ -917,7 +917,8 @@ body[data-theme="amber"]   { --phos: var(--neon-y); }
 .nm-op-list { display: flex; flex-direction: column; gap: 6px; }
 .nm-op-loading { font-size: 11px; color: var(--dim); font-style: italic; }
 .nm-op-row { border: 1px solid #1a2340; padding: 6px; background: rgba(0,0,0,0.3); }
-.nm-op-row.running { border-color: var(--neon-c); opacity: 0.6; }
+.nm-op-row.running  { border-color: var(--neon-c); opacity: 0.6; }
+.nm-op-row.cooldown { border-color: #2a2a40; opacity: 0.5; }
 .nm-op-top { display: flex; align-items: center; justify-content: space-between; gap: 4px; margin-bottom: 3px; }
 .nm-op-btn {
   flex: 1; background: transparent; border: 1px solid #3a4a60;

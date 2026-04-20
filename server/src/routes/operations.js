@@ -118,6 +118,21 @@ export default async function operationsRoutes(fastify, io, onlinePlayers) {
     )
     const probed = probeRow?.reward_meta ?? null
 
+    // Cooldown: most recent collected op per type on this target (within 24h)
+    const COOLDOWN_MS = 24 * 60 * 60 * 1000
+    const [cooldownRows] = await db.query(
+      `SELECT operation, MAX(completes_at) AS last_at
+       FROM hack_operations
+       WHERE attacker_id = ? AND target_id = ? AND status = 'collected'
+         AND completes_at > DATE_SUB(NOW(), INTERVAL 24 HOUR)
+       GROUP BY operation`,
+      [playerId, target.id]
+    )
+    const cooldowns = Object.fromEntries(cooldownRows.map(r => [
+      r.operation,
+      new Date(r.last_at).getTime() + COOLDOWN_MS,
+    ]))
+
     const ops = Object.entries(OPERATIONS).map(([type, cfg]) => {
       const success_pct  = Math.round(calcSuccess(cfg, attacker, target) * 100)
       const duration_ms  = calcDurationMs(cfg, attacker, target)
@@ -132,8 +147,9 @@ export default async function operationsRoutes(fastify, io, onlinePlayers) {
         label:       cfg.label,
         duration_ms,
         success_pct,
-        rewards_desc: rewards_parts.join(' '),
-        running:     runningOps.has(type),
+        rewards_desc:   rewards_parts.join(' '),
+        running:        runningOps.has(type),
+        cooldown_until: cooldowns[type] ?? null,
       }
     })
 
@@ -157,7 +173,7 @@ export default async function operationsRoutes(fastify, io, onlinePlayers) {
               m.hostname AS target_hostname
        FROM hack_operations o
        JOIN machines m ON m.id = o.target_id
-       WHERE o.attacker_id = ? AND o.status IN ('running','success','failed')
+       WHERE o.attacker_id = ? AND o.status = 'running'
        ORDER BY o.completes_at ASC`,
       [playerId]
     )
@@ -304,7 +320,6 @@ export default async function operationsRoutes(fastify, io, onlinePlayers) {
     }
 
     const success = !!op.will_succeed
-    const newStatus = success ? 'success' : 'failed'
 
     const conn = await db.getConnection()
     try {
@@ -312,7 +327,7 @@ export default async function operationsRoutes(fastify, io, onlinePlayers) {
 
       await conn.query(
         'UPDATE hack_operations SET status = ? WHERE id = ?',
-        [newStatus, id]
+        ['collected', id]
       )
 
       if (success) {
