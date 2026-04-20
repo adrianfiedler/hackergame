@@ -725,191 +725,71 @@ export function NetMap({ onRunCommand }) {
 
 // ── MusicPlayer ───────────────────────────────────────────────────────────────
 
-const NOTE_FREQ = {
-  C3:130.81,D3:146.83,E3:164.81,F3:174.61,G3:196.00,A3:220.00,B3:246.94,
-  C4:261.63,D4:293.66,E4:329.63,F4:349.23,G4:392.00,A4:440.00,B4:493.88,
-  C5:523.25,D5:587.33,E5:659.25,F5:698.46,G5:783.99,A5:880.00,B5:987.77,
-}
-
-const MP_TRACKS = [
-  { id:0, title:'NEURAL_DRIFT.MOD',    artist:'zer0_c00l',    bpm:90,  wave:'square',
-    seq:[['A4',1],['0',0.5],['E4',0.5],['C4',1],['0',0.5],['D4',0.5],['E4',1],['0',1],
-         ['A4',1],['G4',0.5],['E4',0.5],['0',1],['F4',1],['E4',1],['D4',1],['C4',1],
-         ['0',1],['A3',1],['C4',1],['D4',1],['E4',2],['0',1],
-         ['G4',1],['A4',1],['B4',0.5],['A4',0.5],['G4',2],
-         ['E4',1],['D4',0.5],['C4',0.5],['A3',1],['0',2]] },
-  { id:1, title:'GIBSON_OVERTURE',     artist:'acid_burn',    bpm:140, wave:'square',
-    seq:[['C4',0.5],['E4',0.5],['G4',0.5],['C5',0.5],['B4',1],['G4',0.5],['E4',0.5],
-         ['F4',0.5],['A4',0.5],['C5',0.5],['F5',0.5],['E5',1],['C5',0.5],['A4',0.5],
-         ['D4',0.5],['F4',0.5],['A4',0.5],['D5',0.5],['C5',1],['A4',0.5],['F4',0.5],
-         ['G4',0.5],['B4',0.5],['D5',0.5],['G5',0.5],['F5',1],['D5',0.5],['B4',0.5],
-         ['C5',2],['0',0.5],['G4',0.5],['A4',0.5],['B4',0.5],
-         ['C5',0.5],['D5',1],['C5',0.5],['B4',0.5],['A4',1],
-         ['G4',1],['F4',0.5],['E4',0.5],['D4',1],['C4',2]] },
-  { id:2, title:'DARKFIBER_BLUES',     artist:'phantom',      bpm:95,  wave:'sawtooth',
-    seq:[['A3',1],['C4',0.5],['D4',0.5],['0',0.5],['D4',0.5],['C4',1],
-         ['A3',1],['0',0.5],['G3',0.5],['A3',1],['C4',0.5],['D4',0.5],
-         ['E4',1],['0',0.5],['D4',0.5],['C4',1],['A3',1],['G3',1],
-         ['0',0.5],['A3',0.5],['C4',1],['A3',2],
-         ['D4',1],['0',0.5],['E4',0.5],['G4',1],['E4',0.5],['D4',0.5],
-         ['C4',1],['A3',1],['0',1],['G3',1],
-         ['A3',0.5],['C4',0.5],['D4',0.5],['E4',0.5],['G4',1],['E4',0.5],['D4',0.5],
-         ['C4',1],['A3',2]] },
-  { id:3, title:'ELLINGSON_MAINFRAME', artist:'lord_nikon',   bpm:160, wave:'square',
-    seq:[['E4',0.5],['F4',0.5],['G4',0.5],['A4',0.5],['B4',0.5],['C5',0.5],['D5',0.5],['E5',0.5],
-         ['D5',0.5],['C5',0.5],['B4',0.5],['A4',0.5],['G4',1],['0',1],
-         ['A4',0.5],['B4',0.5],['C5',0.5],['B4',0.5],['A4',0.5],['G4',0.5],['F4',0.5],['E4',0.5],
-         ['D4',0.5],['E4',0.5],['F4',0.5],['G4',0.5],['A4',2],
-         ['C5',0.5],['B4',0.5],['A4',0.5],['G4',0.5],['F4',0.5],['E4',0.5],['D4',0.5],['C4',0.5],
-         ['D4',0.5],['F4',0.5],['A4',0.5],['C5',0.5],['B4',1],['A4',1],
-         ['G4',0.5],['A4',0.5],['B4',0.5],['C5',0.5],['D5',0.5],['C5',0.5],['B4',0.5],['A4',0.5],
-         ['G4',2],['0',2]] },
-  { id:4, title:'ICE_BREAKER_v2',      artist:'crashoverride', bpm:100, wave:'triangle',
-    seq:[['G4',1],['A4',0.5],['B4',0.5],['C5',1],['B4',0.5],['A4',0.5],
-         ['G4',1],['0',0.5],['D4',0.5],['E4',1],['F4',1],
-         ['G4',0.5],['A4',0.5],['B4',0.5],['A4',0.5],['G4',1],['F4',0.5],['E4',0.5],
-         ['D4',2],['0',1],['G4',1],
-         ['E5',1],['D5',0.5],['C5',0.5],['B4',1],['A4',0.5],['G4',0.5],
-         ['A4',1],['B4',0.5],['C5',0.5],['D5',1],['C5',1],
-         ['B4',0.5],['A4',0.5],['G4',1],['F4',0.5],['E4',0.5],['D4',1],
-         ['G4',2],['0',2]] },
-]
-
-function mpTrackDur(track) {
-  const bd = 60 / track.bpm
-  return track.seq.reduce((s, [, b]) => s + b * bd, 0)
-}
 function fmtMpTime(s) {
   if (!isFinite(s) || s < 0) return '0:00'
   return `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}`
 }
 
 export function MusicPlayer() {
+  const [tracks, setTracks]     = useState([])
   const [trackIdx, setTrackIdx] = useState(0)
   const [playing, setPlaying]   = useState(false)
   const [elapsed, setElapsed]   = useState(0)
+  const [duration, setDuration] = useState(0)
   const [volume, setVolume]     = useState(0.5)
   const [shuffle, setShuffle]   = useState(false)
   const [repeat, setRepeat]     = useState(false)
   const [bars, setBars]         = useState(() => Array(24).fill(3))
 
   const ctxRef         = useRef(null)
-  const gainRef        = useRef(null)
   const analyserRef    = useRef(null)
-  const nodesRef       = useRef([])
-  const startAudioRef  = useRef(0)
-  const startElapRef   = useRef(0)
-  const totalDurRef    = useRef(0)
+  const audioElRef     = useRef(null)
+  const mediaSourceRef = useRef(null)
   const playingRef     = useRef(false)
   const trackIdxRef    = useRef(0)
-  const elapsedRef     = useRef(0)
+  const tracksRef      = useRef([])
   const shuffleRef     = useRef(false)
   const repeatRef      = useRef(false)
   const rafRef         = useRef(null)
-  const advancingRef   = useRef(false)
 
-  useEffect(() => { playingRef.current  = playing },   [playing])
+  useEffect(() => { playingRef.current  = playing },  [playing])
   useEffect(() => { trackIdxRef.current = trackIdx }, [trackIdx])
-  useEffect(() => { shuffleRef.current  = shuffle },   [shuffle])
-  useEffect(() => { repeatRef.current   = repeat },    [repeat])
+  useEffect(() => { tracksRef.current   = tracks },   [tracks])
+  useEffect(() => { shuffleRef.current  = shuffle },  [shuffle])
+  useEffect(() => { repeatRef.current   = repeat },   [repeat])
+
+  useEffect(() => {
+    fetch('/api/music').then(r => r.json()).then(t => { if (t.length) setTracks(t) }).catch(() => {})
+  }, [])
 
   const initAudio = useCallback(() => {
     if (ctxRef.current) return
     const ctx = new AudioContext()
-    const gain = ctx.createGain()
-    const an   = ctx.createAnalyser()
+    const an  = ctx.createAnalyser()
     an.fftSize = 64
-    gain.gain.value = 0.4
-    gain.connect(an)
     an.connect(ctx.destination)
-    ctxRef.current    = ctx
-    gainRef.current   = gain
+    ctxRef.current      = ctx
     analyserRef.current = an
-  }, [])
-
-  const stopNodes = useCallback(() => {
-    nodesRef.current.forEach(({ osc, g }) => {
-      try { osc.stop(); osc.disconnect() } catch {}
-      try { g.disconnect() } catch {}
-    })
-    nodesRef.current = []
-  }, [])
-
-  const doSchedule = useCallback((track, fromElap) => {
-    const ctx  = ctxRef.current
-    const gain = gainRef.current
-    if (!ctx || !gain) return
-    const bd    = 60 / track.bpm
-    const nodes = []
-    let t = 0
-    for (const [note, beats] of track.seq) {
-      const dur   = beats * bd
-      const start = t
-      t += dur
-      if (start < fromElap - 0.01) continue
-      const freq = NOTE_FREQ[note]
-      if (!freq) continue
-      const at = ctx.currentTime + (start - fromElap) + 0.06
-      if (at <= ctx.currentTime + 0.01) continue
-      const osc = ctx.createOscillator()
-      const g   = ctx.createGain()
-      osc.type = track.wave
-      osc.frequency.value = freq
-      g.gain.setValueAtTime(0, at)
-      g.gain.linearRampToValueAtTime(0.3, at + 0.01)
-      g.gain.setValueAtTime(0.3, at + dur * 0.82)
-      g.gain.linearRampToValueAtTime(0, at + dur * 0.97)
-      osc.connect(g)
-      g.connect(gain)
-      osc.start(at)
-      osc.stop(at + dur)
-      nodes.push({ osc, g })
+    if (audioElRef.current && !mediaSourceRef.current) {
+      const src = ctx.createMediaElementSource(audioElRef.current)
+      src.connect(an)
+      mediaSourceRef.current = src
     }
-    nodesRef.current    = nodes
-    startAudioRef.current = ctx.currentTime
-    startElapRef.current  = fromElap
-    totalDurRef.current   = t
   }, [])
 
-  // RAF: progress + visualizer + auto-advance
+  // RAF: progress + visualizer
   useEffect(() => {
     const tick = () => {
       rafRef.current = requestAnimationFrame(tick)
-
-      if (playingRef.current && ctxRef.current) {
-        const ne = startElapRef.current + (ctxRef.current.currentTime - startAudioRef.current)
-        elapsedRef.current = ne
-        setElapsed(ne)
-
-        if (!advancingRef.current && totalDurRef.current > 0 && ne >= totalDurRef.current - 0.12) {
-          advancingRef.current = true
-          stopNodes()
-          const next = repeatRef.current
-            ? trackIdxRef.current
-            : shuffleRef.current
-              ? Math.floor(Math.random() * MP_TRACKS.length)
-              : (trackIdxRef.current + 1) % MP_TRACKS.length
-          if (!repeatRef.current) {
-            setTrackIdx(next)
-            trackIdxRef.current = next
-          }
-          startElapRef.current = 0
-          elapsedRef.current   = 0
-          setElapsed(0)
-          doSchedule(MP_TRACKS[next], 0)
-          setTimeout(() => { advancingRef.current = false }, 500)
-        }
-      }
-
-      // Visualizer bars
+      const el = audioElRef.current
+      if (playingRef.current && el) setElapsed(el.currentTime)
       if (analyserRef.current) {
-        const data = new Uint8Array(analyserRef.current.frequencyBinCount)
+        const data  = new Uint8Array(analyserRef.current.frequencyBinCount)
         analyserRef.current.getByteFrequencyData(data)
         const chunk = Math.max(1, Math.floor(data.length / 24))
         setBars(Array.from({ length: 24 }, (_, i) => {
-          const sl  = data.slice(i * chunk, (i + 1) * chunk)
-          const avg = sl.reduce((a, v) => a + v, 0) / sl.length
-          return Math.max(3, (avg / 255) * 48)
+          const sl = data.slice(i * chunk, (i + 1) * chunk)
+          return Math.max(3, (sl.reduce((a, v) => a + v, 0) / sl.length / 255) * 48)
         }))
       } else {
         setBars(prev => prev.map(b => Math.max(3, Math.min(9, b + (Math.random() - 0.5) * 1.8))))
@@ -917,98 +797,115 @@ export function MusicPlayer() {
     }
     tick()
     return () => cancelAnimationFrame(rafRef.current)
-  }, [stopNodes, doSchedule])
+  }, [])
+
+  const advance = useCallback(() => {
+    const tl   = tracksRef.current.length
+    if (!tl) return
+    const next = repeatRef.current  ? trackIdxRef.current
+      : shuffleRef.current ? Math.floor(Math.random() * tl)
+      : (trackIdxRef.current + 1) % tl
+    setTrackIdx(next); trackIdxRef.current = next
+    setElapsed(0); setDuration(0)
+    if (audioElRef.current) {
+      audioElRef.current.src = tracksRef.current[next].src
+      audioElRef.current.play().catch(() => {})
+    }
+  }, [])
+
+  const playTrack = useCallback((idx) => {
+    const t = tracksRef.current[idx]
+    if (!t || !audioElRef.current) return
+    initAudio()
+    ctxRef.current?.resume()
+    setTrackIdx(idx); trackIdxRef.current = idx
+    setElapsed(0); setDuration(0)
+    audioElRef.current.src = t.src
+    audioElRef.current.play().catch(() => {})
+    setPlaying(true)
+    Audio.key()
+  }, [initAudio])
 
   const togglePlay = () => {
+    if (!tracks.length || !audioElRef.current) return
     initAudio()
-    const ctx = ctxRef.current
-    if (!ctx) return
-    if (ctx.state === 'suspended') ctx.resume()
+    ctxRef.current?.resume()
     if (playing) {
-      stopNodes()
-      elapsedRef.current = startElapRef.current + (ctx.currentTime - startAudioRef.current)
-      setElapsed(elapsedRef.current)
+      audioElRef.current.pause()
       setPlaying(false)
       Audio.blip(440, 0.04)
     } else {
-      doSchedule(MP_TRACKS[trackIdx], elapsedRef.current)
+      if (!audioElRef.current.src) {
+        audioElRef.current.src = tracks[trackIdx]?.src
+      }
+      audioElRef.current.play().catch(() => {})
       setPlaying(true)
       Audio.blip(660, 0.04)
     }
   }
 
-  const playTrack = useCallback((idx) => {
-    stopNodes()
-    setTrackIdx(idx)
-    trackIdxRef.current = idx
-    elapsedRef.current  = 0
-    setElapsed(0)
-    initAudio()
-    const ctx = ctxRef.current
-    if (ctx?.state === 'suspended') ctx.resume()
-    doSchedule(MP_TRACKS[idx], 0)
-    setPlaying(true)
-    Audio.key()
-  }, [stopNodes, initAudio, doSchedule])
-
   const skipNext = () => playTrack(
-    shuffle ? Math.floor(Math.random() * MP_TRACKS.length) : (trackIdx + 1) % MP_TRACKS.length
+    shuffle ? Math.floor(Math.random() * tracks.length) : (trackIdx + 1) % tracks.length
   )
   const skipPrev = () => {
-    if (elapsedRef.current > 3) {
-      stopNodes(); elapsedRef.current = 0; setElapsed(0)
-      if (playing) { doSchedule(MP_TRACKS[trackIdx], 0) }
-      Audio.key()
+    if (!audioElRef.current) return
+    if (audioElRef.current.currentTime > 3) {
+      audioElRef.current.currentTime = 0
     } else {
-      playTrack((trackIdx - 1 + MP_TRACKS.length) % MP_TRACKS.length)
+      playTrack((trackIdx - 1 + tracks.length) % tracks.length)
     }
+    Audio.key()
   }
 
   const seek = (e) => {
+    const el = audioElRef.current
+    if (!el || !duration) return
     const rect = e.currentTarget.getBoundingClientRect()
     const pct  = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width))
-    const to   = pct * (totalDurRef.current || mpTrackDur(MP_TRACKS[trackIdx]))
-    stopNodes(); elapsedRef.current = to; setElapsed(to)
-    if (playing) {
-      const ctx = ctxRef.current
-      if (ctx?.state === 'suspended') ctx.resume()
-      doSchedule(MP_TRACKS[trackIdx], to)
-    }
+    el.currentTime = pct * duration
+    setElapsed(pct * duration)
   }
 
   const onVolClick = (e) => {
     const rect = e.currentTarget.getBoundingClientRect()
     const v = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width))
     setVolume(v)
-    if (gainRef.current) gainRef.current.gain.value = v * 0.4
+    if (audioElRef.current) audioElRef.current.volume = v
   }
 
   useEffect(() => () => {
-    stopNodes()
     cancelAnimationFrame(rafRef.current)
     ctxRef.current?.close().catch(() => {})
-  }, [stopNodes])
+  }, [])
 
-  const track    = MP_TRACKS[trackIdx]
-  const totalDur = totalDurRef.current || mpTrackDur(track)
-  const progress = totalDur > 0 ? Math.min(1, elapsed / totalDur) : 0
+  const track    = tracks[trackIdx]
+  const progress = duration > 0 ? Math.min(1, elapsed / duration) : 0
 
   return (
     <div className="mp">
+      <audio
+        ref={audioElRef}
+        onEnded={advance}
+        onLoadedMetadata={() => setDuration(audioElRef.current?.duration || 0)}
+        onPlay={() => setPlaying(true)}
+        onPause={() => setPlaying(false)}
+        style={{ display: 'none' }}
+      />
+
       <div className="mp-hdr">◆ MEDIA.PLAYER v1.0 ◆</div>
 
-      {/* Visualizer */}
       <div className="mp-viz">
         {bars.map((h, i) => <div key={i} className="mp-bar" style={{ height: `${h}px` }} />)}
       </div>
 
-      {/* Now playing */}
       <div className="mp-nowplaying">
-        <div className="mp-track-title">{playing ? '▶' : '■'} {track.title}</div>
-        <div className="mp-track-meta">{track.artist} · {track.wave} wave · {track.bpm} BPM</div>
+        {tracks.length === 0
+          ? <div className="mp-track-title" style={{ color: 'var(--dim)' }}>■ NO TRACKS — drop mp3s in /music/</div>
+          : <div className="mp-track-title">{playing ? '▶' : '■'} {track?.title}</div>
+        }
+        <div className="mp-track-meta">{track?.artist ? `${track.artist} · ` : ''}audio file</div>
       </div>
 
-      {/* Progress */}
       <div className="mp-prog-wrap" onClick={seek}>
         <div className="mp-prog">
           <div className="mp-prog-fill" style={{ width: `${progress * 100}%` }} />
@@ -1017,19 +914,17 @@ export function MusicPlayer() {
       </div>
       <div className="mp-times">
         <span>{fmtMpTime(elapsed)}</span>
-        <span>{fmtMpTime(totalDur)}</span>
+        <span>{duration > 0 ? fmtMpTime(duration) : '--:--'}</span>
       </div>
 
-      {/* Controls */}
       <div className="mp-ctrl">
-        <button className={'mp-btn mp-sm' + (shuffle ? ' mp-on' : '')} onClick={() => { setShuffle(s => !s); Audio.key() }} title="Shuffle">⇌</button>
-        <button className="mp-btn" onClick={skipPrev} title="Previous">|◄</button>
-        <button className="mp-btn mp-lg" onClick={togglePlay} title={playing ? 'Pause' : 'Play'}>{playing ? '⏸' : '▶'}</button>
-        <button className="mp-btn" onClick={skipNext} title="Next">►|</button>
-        <button className={'mp-btn mp-sm' + (repeat ? ' mp-on' : '')} onClick={() => { setRepeat(r => !r); Audio.key() }} title="Repeat">↺</button>
+        <button className={'mp-btn mp-sm' + (shuffle ? ' mp-on' : '')} onClick={() => { setShuffle(s => !s); Audio.key() }}>⇌</button>
+        <button className="mp-btn" onClick={skipPrev}>|◄</button>
+        <button className="mp-btn mp-lg" onClick={togglePlay}>{playing ? '⏸' : '▶'}</button>
+        <button className="mp-btn" onClick={skipNext}>►|</button>
+        <button className={'mp-btn mp-sm' + (repeat ? ' mp-on' : '')} onClick={() => { setRepeat(r => !r); Audio.key() }}>↺</button>
       </div>
 
-      {/* Volume */}
       <div className="mp-vol-row">
         <span className="mp-vol-lbl">VOL</span>
         <div className="mp-vol-track" onClick={onVolClick}>
@@ -1040,17 +935,13 @@ export function MusicPlayer() {
         <span className="mp-vol-pct">{Math.round(volume * 100)}%</span>
       </div>
 
-      {/* Playlist */}
       <div className="mp-playlist">
-        <div className="mp-pl-hdr">// PLAYLIST — {MP_TRACKS.length} tracks</div>
-        {MP_TRACKS.map((t, i) => (
-          <div key={t.id}
-            className={'mp-pl-row' + (i === trackIdx ? ' active' : '')}
-            onClick={() => playTrack(i)}
-          >
+        <div className="mp-pl-hdr">// PLAYLIST — {tracks.length} tracks</div>
+        {tracks.map((t, i) => (
+          <div key={t.id} className={'mp-pl-row' + (i === trackIdx ? ' active' : '')} onClick={() => playTrack(i)}>
             <span className="mp-pl-num">{String(i + 1).padStart(2, '0')}</span>
-            <span className="mp-pl-name">{t.title}</span>
-            <span className="mp-pl-dur">{fmtMpTime(mpTrackDur(t))}</span>
+            <span className="mp-pl-name">{t.title}{t.artist ? ` — ${t.artist}` : ''}</span>
+            <span className="mp-pl-dur">--:--</span>
             {i === trackIdx && <span className="mp-pl-ind">{playing ? '▶' : '■'}</span>}
           </div>
         ))}
