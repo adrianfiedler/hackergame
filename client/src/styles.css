@@ -896,3 +896,84 @@ body[data-theme="amber"]   { --phos: var(--neon-y); }
 .leg-item .occupied { color: var(--neon-c); border-color: var(--neon-c); }
 .leg-item .owned-indicator { background: rgba(0, 231, 255, 0.25); border-color: var(--neon-c); color: transparent; }
 
+/* ── NetMap sidebar wider for ops ── */
+.netmap-sidebar { width: 240px; overflow-y: auto; }
+.netmap-header-right { display: flex; align-items: center; gap: 10px; }
+.nm-resource { font-size: 12px; color: var(--neon-c); letter-spacing: 0.05em; }
+.nm-zeroday  { color: var(--neon-m); }
+
+/* Probed firewall badge */
+.nm-probed-info {
+  display: flex; gap: 8px; margin-bottom: 8px;
+  font-size: 11px; color: var(--neon-y);
+  border: 1px solid rgba(255, 200, 0, 0.3); padding: 3px 6px;
+}
+
+/* Slot indicator */
+.nm-slots { font-size: 11px; color: var(--dim); margin-bottom: 8px; letter-spacing: 0.08em; }
+.nm-slots-full { color: #ff4444; }
+
+/* Operations list */
+.nm-op-list { display: flex; flex-direction: column; gap: 6px; }
+.nm-op-loading { font-size: 11px; color: var(--dim); font-style: italic; }
+.nm-op-row { border: 1px solid #1a2340; padding: 6px; background: rgba(0,0,0,0.3); }
+.nm-op-row.running { border-color: var(--neon-c); opacity: 0.6; }
+.nm-op-top { display: flex; align-items: center; justify-content: space-between; gap: 4px; margin-bottom: 3px; }
+.nm-op-btn {
+  flex: 1; background: transparent; border: 1px solid #3a4a60;
+  color: #ccc; font-family: inherit; font-size: 12px; cursor: pointer;
+  padding: 4px 6px; text-align: left; letter-spacing: 0.05em;
+}
+.nm-op-btn:hover:not(:disabled) { border-color: var(--neon-c); color: var(--neon-c); background: rgba(0,231,255,0.05); }
+.nm-op-btn:disabled { opacity: 0.4; cursor: default; }
+.nm-op-success { font-size: 13px; font-weight: bold; min-width: 36px; text-align: right; }
+.nm-op-meta { display: flex; justify-content: space-between; font-size: 10px; color: var(--dim); }
+.nm-op-rew  { color: var(--neon-y); }
+.nm-redacted { color: #444; font-style: italic; }
+
+/* ── Desktop notifications ────────────────────────────────────────────────── */
+.notif-stack {
+  position: fixed; bottom: 36px; right: 12px;
+  display: flex; flex-direction: column; gap: 6px;
+  z-index: 9999; pointer-events: none;
+}
+.notif {
+  font-family: 'VT323', monospace; font-size: 14px; letter-spacing: 0.05em;
+  padding: 8px 10px; border: 1px solid; background: #070914;
+  display: flex; align-items: center; gap: 10px;
+  pointer-events: all; max-width: 360px;
+  animation: notif-slide 0.2s ease;
+}
+.notif-success { border-color: var(--neon-g, #39ff14); color: var(--neon-g, #39ff14); }
+.notif-fail    { border-color: #ff4444; color: #ff4444; }
+.notif-text    { flex: 1; }
+.notif button  {
+  background: none; border: none; cursor: pointer;
+  font-family: inherit; font-size: 18px; line-height: 1;
+  color: inherit; opacity: 0.6; padding: 0 2px;
+}
+.notif button:hover { opacity: 1; }
+@keyframes notif-slide {
+  from { opacity: 0; transform: translateX(16px); }
+  to   { opacity: 1; transform: none; }
+}
+
+/* Active ops panel */
+.nm-active-ops { border-top: 1px solid #1a2340; padding-top: 10px; display: flex; flex-direction: column; gap: 8px; }
+.nm-active-title { font-size: 10px; color: var(--dim); letter-spacing: 0.12em; margin-bottom: 4px; }
+.nm-op-active-row { background: rgba(0,0,0,0.3); border: 1px solid #1a2340; padding: 6px; }
+.nm-op-active-header { display: flex; justify-content: space-between; font-size: 11px; margin-bottom: 4px; }
+.nm-op-active-host { color: var(--neon-c); }
+.nm-op-active-type { color: var(--dim); }
+.nm-op-bar-row { display: flex; align-items: center; gap: 6px; }
+.nm-op-bar { flex: 1; height: 6px; background: #1a2340; border: 1px solid #2a3450; }
+.nm-op-bar-fill { height: 100%; background: var(--neon-c); }
+.nm-op-timer { font-size: 11px; color: var(--dim); min-width: 48px; text-align: right; white-space: nowrap; }
+.nm-collect-btn {
+  font-family: inherit; font-size: 11px; cursor: pointer;
+  background: transparent; border: 1px solid var(--neon-g, #39ff14);
+  color: var(--neon-g, #39ff14); padding: 1px 6px;
+}
+.nm-collect-btn:hover:not(:disabled) { background: var(--neon-g, #39ff14); color: #000; }
+.nm-collect-btn:disabled { opacity: 0.5; cursor: default; }
+

@@ -7,6 +7,8 @@ CREATE TABLE IF NOT EXISTS players (
   username      VARCHAR(32) NOT NULL,
   wallet_addr   VARCHAR(42) NOT NULL,
   crypto        DOUBLE NOT NULL DEFAULT 0,
+  intel         INT NOT NULL DEFAULT 0,
+  zero_days     INT NOT NULL DEFAULT 0,
   avatar_url    VARCHAR(512) NULL,
   local_data    JSON NULL,
   created_at    DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -202,3 +204,25 @@ ON DUPLICATE KEY UPDATE
   puzzle_kind   = VALUES(puzzle_kind),
   hack_reward   = VALUES(hack_reward),
   flavor        = VALUES(flavor);
+
+-- ── Time-based hack operations ────────────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS hack_operations (
+  id             CHAR(36)     NOT NULL,
+  attacker_id    CHAR(36)     NOT NULL,
+  target_id      CHAR(36)     NOT NULL,
+  operation      VARCHAR(32)  NOT NULL,
+  started_at     DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  completes_at   DATETIME     NOT NULL,
+  status         ENUM('running','success','failed','collected') NOT NULL DEFAULT 'running',
+  will_succeed   TINYINT(1)   NOT NULL DEFAULT 0,
+  reward_crypto  DECIMAL(12,6) NOT NULL DEFAULT 0,
+  reward_intel   INT          NOT NULL DEFAULT 0,
+  reward_zeroday INT          NOT NULL DEFAULT 0,
+  reward_meta    JSON         NULL,
+  PRIMARY KEY (id),
+  KEY idx_ops_attacker (attacker_id),
+  KEY idx_ops_target   (target_id),
+  KEY idx_ops_status   (status, completes_at),
+  CONSTRAINT fk_ops_attacker FOREIGN KEY (attacker_id) REFERENCES players  (id) ON DELETE CASCADE,
+  CONSTRAINT fk_ops_target   FOREIGN KEY (target_id)   REFERENCES machines (id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;

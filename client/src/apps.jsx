@@ -1,4 +1,5 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
+import { useAuth } from './auth/AuthContext.jsx'
 import { Audio, fmtCrypto, fmtHs } from './state.jsx'
 import { I } from './icons.jsx'
 import socket from './socket.js'
@@ -406,37 +407,165 @@ export function IrcApp({ player }) {
 }
 
 // ── NetMap ────────────────────────────────────────────────────────────────────
+function fmtDuration(ms) {
+  if (ms <= 0) return 'READY'
+  const h = Math.floor(ms / 3600000)
+  const m = Math.floor((ms % 3600000) / 60000)
+  const s = Math.floor((ms % 60000) / 1000)
+  if (h > 0) return `${h}h ${m}m`
+  if (m > 0) return `${m}m ${s}s`
+  return `${s}s`
+}
+
+function successColor(pct) {
+  if (pct >= 70) return 'var(--neon-g, #39ff14)'
+  if (pct >= 45) return 'var(--neon-y)'
+  return '#ff4444'
+}
+
 export function NetMap({ onRunCommand }) {
-  const [loading, setLoading] = useState(true)
-  const [data, setData]       = useState({ sector: 0, subnet: 0, nodes: [] })
-  const [selected, setSelected] = useState(null)
+  const { player, setPlayer } = useAuth()
+  const [loading, setLoading]     = useState(true)
+  const [data, setData]           = useState({ sector: 0, subnet: 0, nodes: [] })
+  const [selected, setSelected]   = useState(null)
+  const [ops, setOps]             = useState([])
+  const [slots, setSlots]         = useState({ used: 0, max: 1 })
+  const [opInfo, setOpInfo]       = useState(null)
+  const [opInfoLoading, setOpInfoLoading] = useState(false)
+  const [launching, setLaunching] = useState(null)
+  const [collecting, setCollecting] = useState(null)
+  const [now, setNow]             = useState(Date.now())
+
+  useEffect(() => {
+    const id = setInterval(() => setNow(Date.now()), 1000)
+    return () => clearInterval(id)
+  }, [])
 
   const fetchNeighborhood = async () => {
     setLoading(true)
     try {
       const res = await fetch('/api/grid/neighborhood')
-      if (res.ok) {
-        const d = await res.json()
-        setData(d)
-      }
+      if (res.ok) setData(await res.json())
     } catch (err) {
       console.error('[NetMap] fetch failed:', err)
     } finally {
-      setTimeout(() => setLoading(false), 800) // Aesthetic delay
+      setTimeout(() => setLoading(false), 800)
     }
   }
 
-  useEffect(() => { fetchNeighborhood() }, [])
+  const fetchOps = useCallback(async () => {
+    try {
+      const res = await fetch('/api/operations')
+      if (res.ok) {
+        const d = await res.json()
+        setOps(d.ops)
+        setSlots(d.slots)
+      }
+    } catch {}
+  }, [])
 
-  const grid = Array.from({ length: 256 }, (_, i) => {
-    return data.nodes.find(n => n.node_id === i) || null
-  })
+  const fetchOpInfo = useCallback(async (hostname) => {
+    setOpInfoLoading(true)
+    setOpInfo(null)
+    try {
+      const res = await fetch(`/api/operations/info?hostname=${encodeURIComponent(hostname)}`)
+      if (res.ok) setOpInfo(await res.json())
+    } catch {}
+    setOpInfoLoading(false)
+  }, [])
+
+  useEffect(() => {
+    fetchNeighborhood()
+    fetchOps()
+    const id = setInterval(fetchOps, 30000)
+    return () => clearInterval(id)
+  }, [fetchOps])
+
+  useEffect(() => {
+    if (selected && !selected.is_self) fetchOpInfo(selected.hostname)
+    else setOpInfo(null)
+  }, [selected, fetchOpInfo])
+
+  const launchOp = async (opType) => {
+    setLaunching(opType)
+    try {
+      const res = await fetch('/api/operations/start', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ hostname: selected.hostname, operation: opType }),
+      })
+      if (res.ok) {
+        const d = await res.json()
+        // Inject op immediately so progress bar starts at 0% without waiting for fetchOps
+        setOps(prev => [...prev, {
+          id:              '_pending_' + opType,
+          operation:       opType,
+          label:           opType.replace(/_/g, ' ').toUpperCase(),
+          target_hostname: selected.hostname,
+          started_at:      d.started_at,
+          completes_at:    d.completes_at,
+          status:          'running',
+          collectable:     false,
+        }])
+        setSlots(s => ({ ...s, used: s.used + 1 }))
+        await fetchOps()          // replaces pending entry with real DB row
+        await fetchOpInfo(selected.hostname)
+      }
+    } catch {}
+    setLaunching(null)
+  }
+
+  const collectOp = async (opId) => {
+    setCollecting(opId)
+    try {
+      const res = await fetch(`/api/operations/${opId}/collect`, { method: 'POST' })
+      if (res.ok) {
+        const d = await res.json()
+        const op = ops.find(o => o.id === opId)
+        if (d.success) {
+          Audio.ok()
+          setPlayer(p => ({
+            ...p,
+            crypto:    p.crypto    + (d.rewards.crypto    || 0),
+            intel:     (p.intel    || 0) + (d.rewards.intel    || 0),
+            zero_days: (p.zero_days || 0) + (d.rewards.zero_days || 0),
+          }))
+          const parts = [
+            d.rewards.crypto    > 0 && `+⟠${d.rewards.crypto.toFixed(3)}`,
+            d.rewards.intel     > 0 && `+${d.rewards.intel} INT`,
+            d.rewards.zero_days > 0 && `+${d.rewards.zero_days} 0DAY`,
+          ].filter(Boolean).join(' ')
+          window.dispatchEvent(new CustomEvent('hx:notify', { detail: {
+            type: 'success',
+            text: `${(d.operation || '').toUpperCase()} COMPLETE: ${op?.target_hostname}${parts ? ' — ' + parts : ''}`,
+          }}))
+        } else {
+          Audio.err()
+          window.dispatchEvent(new CustomEvent('hx:notify', { detail: {
+            type: 'fail',
+            text: `${(d.operation || '').toUpperCase()} FAILED: ${op?.target_hostname} — connection rejected`,
+          }}))
+        }
+        await fetchOps()
+        if (selected && !selected.is_self) await fetchOpInfo(selected.hostname)
+      }
+    } catch {}
+    setCollecting(null)
+  }
+
+  const grid = Array.from({ length: 256 }, (_, i) =>
+    data.nodes.find(n => n.node_id === i) || null
+  )
 
   return (
     <div className="netmap">
       <div className="netmap-header">
         <div className="netmap-title">NETMAP v4.0 — SCANNING 10.{data.sector}.{data.subnet}.*</div>
-        <button onClick={fetchNeighborhood} disabled={loading} className="netmap-refresh">RE-SCAN</button>
+        <div className="netmap-header-right">
+          <span className="nm-resource">[INT: {player?.intel ?? 0}]</span>
+          <span className="nm-resource nm-zeroday">[0DAY: {player?.zero_days ?? 0}]</span>
+          <button onClick={fetchNeighborhood} disabled={loading} className="netmap-refresh">RE-SCAN</button>
+        </div>
       </div>
 
       <div className="netmap-body">
@@ -449,7 +578,7 @@ export function NetMap({ onRunCommand }) {
           )}
           <div className="netmap-grid">
             {grid.map((node, i) => (
-              <div key={i} 
+              <div key={i}
                 className={`netmap-node ${node ? 'occupied' : ''} ${node?.is_self ? 'self' : ''} ${node?.is_npc ? 'npc' : ''} ${selected?.node_id === i ? 'selected' : ''} ${node?.owned ? 'owned' : ''}`}
                 onClick={() => node && setSelected(node)}
                 title={node ? `${node.hostname} (${node.ip})` : `10.${data.sector}.${data.subnet}.${i}`}
@@ -461,34 +590,121 @@ export function NetMap({ onRunCommand }) {
         </div>
 
         <div className="netmap-sidebar">
+          {/* ── Node info ── */}
           {selected ? (
             <div className="node-info">
               <div className="info-label">HOSTNAME</div>
               <div className="info-value">{selected.hostname}</div>
-              
               <div className="info-label">ADDRESS</div>
               <div className="info-value" style={{ color: 'var(--primary)' }}>{selected.ip}</div>
-              
               <div className="info-label">OWNER</div>
               <div className="info-value">{selected.owner}</div>
-
               <div className="info-label">CLASS</div>
               <div className="info-value">{selected.is_npc ? `Tier ${selected.tier} NPC` : 'Remote Operator'}</div>
 
-              <div className="node-actions" style={{ marginTop: 20 }}>
-                {selected.is_self ? (
-                  <div className="self-tag">LOCAL MACHINE</div>
-                ) : (
-                  <button className="hack-btn" onClick={() => onRunCommand(`hack ${selected.hostname}`)}>
-                    {selected.owned ? 'RE-CONNECT' : 'INFILTRATE'}
-                  </button>
-                )}
-              </div>
+              {selected.is_self ? (
+                <div className="self-tag">LOCAL MACHINE</div>
+              ) : (
+                <>
+                  {/* Firewall info — always shown, REDACTED until probed */}
+                  {opInfo && (
+                    <div className="nm-probed-info">
+                      {opInfo.probed ? (
+                        <>
+                          <span>FW LVL {opInfo.probed.firewall_lvl}</span>
+                          <span>{opInfo.probed.ids_active ? '⚠ IDS ON' : 'IDS OFF'}</span>
+                        </>
+                      ) : (
+                        <span className="nm-redacted">FW [REDACTED] — probe IDS first</span>
+                      )}
+                    </div>
+                  )}
+                  {/* Slot indicator */}
+                  <div className="nm-slots">
+                    SLOTS {slots.used}/{slots.max}
+                    {slots.used >= slots.max && <span className="nm-slots-full"> FULL</span>}
+                  </div>
+                  {/* Operations list */}
+                  <div className="nm-op-list">
+                    {opInfoLoading && <div className="nm-op-loading">SCANNING TARGET...</div>}
+                    {opInfo?.ops.map(op => {
+                      const isRunning  = op.running
+                      const slotFull   = slots.used >= slots.max && !isRunning
+                      const disabled   = isRunning || slotFull || launching === op.type
+                      // scan_ports always shows own rate; others need scan_result first
+                      const revealedPct = opInfo.scan_result?.[`${op.type}_success_pct`]
+                      const showRate    = op.type === 'scan_ports' || revealedPct != null
+                      const displayPct  = op.type === 'scan_ports' ? op.success_pct : revealedPct
+                      return (
+                        <div key={op.type} className={`nm-op-row ${isRunning ? 'running' : ''}`}>
+                          <div className="nm-op-top">
+                            <button
+                              className="nm-op-btn"
+                              disabled={disabled}
+                              onClick={() => launchOp(op.type)}
+                            >
+                              {isRunning ? '▶ RUNNING' : launching === op.type ? '...' : op.label}
+                            </button>
+                            {showRate ? (
+                              <span className="nm-op-success" style={{ color: successColor(displayPct) }}>
+                                {displayPct}%
+                              </span>
+                            ) : (
+                              <span className="nm-op-success nm-redacted">??%</span>
+                            )}
+                          </div>
+                          <div className="nm-op-meta">
+                            <span className="nm-op-dur">{fmtDuration(op.duration_ms)}</span>
+                            <span className="nm-op-rew">{op.rewards_desc}</span>
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>
+                </>
+              )}
             </div>
           ) : (
             <div className="no-node">SELECT A NODE TO ANALYZE</div>
           )}
-          
+
+          {/* ── Active operations ── */}
+          {ops.length > 0 && (
+            <div className="nm-active-ops">
+              <div className="nm-active-title">ACTIVE OPS</div>
+              {ops.map(op => {
+                const remaining = new Date(op.completes_at).getTime() - now
+                const total     = new Date(op.completes_at).getTime() - new Date(op.started_at).getTime()
+                const progress  = Math.min(1, Math.max(0, 1 - remaining / total))
+                const ready     = op.collectable || remaining <= 0
+                return (
+                  <div key={op.id} className="nm-op-active-row">
+                    <div className="nm-op-active-header">
+                      <span className="nm-op-active-host">{op.target_hostname}</span>
+                      <span className="nm-op-active-type">{op.label}</span>
+                    </div>
+                    <div className="nm-op-bar-row">
+                      <div className="nm-op-bar">
+                        <div className="nm-op-bar-fill" style={{ width: `${progress * 100}%` }} />
+                      </div>
+                      {ready ? (
+                        <button
+                          className="nm-collect-btn"
+                          disabled={collecting === op.id}
+                          onClick={() => collectOp(op.id)}
+                        >
+                          {collecting === op.id ? '...' : 'COLLECT'}
+                        </button>
+                      ) : (
+                        <span className="nm-op-timer">{fmtDuration(remaining)}</span>
+                      )}
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          )}
+
           <div className="legend">
             <div className="leg-item"><span className="self">Y</span> YOU</div>
             <div className="leg-item"><span className="npc">N</span> NPC</div>

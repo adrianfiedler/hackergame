@@ -77,6 +77,17 @@ export default function App() {
   const [wins, setWins]           = useState([])
   const [zCounter, setZCounter]   = useState(10)
   const [activeId, setActiveId]   = useState(null)
+  const [notifications, setNotifications] = useState([])
+
+  useEffect(() => {
+    const handler = (e) => {
+      const id = Date.now() + Math.random()
+      setNotifications(n => [...n, { id, ...e.detail }])
+      setTimeout(() => setNotifications(n => n.filter(x => x.id !== id)), 5000)
+    }
+    window.addEventListener('hx:notify', handler)
+    return () => window.removeEventListener('hx:notify', handler)
+  }, [])
   const [selectedIcon, setSelectedIcon] = useState(null)
   const [startOpen, setStartOpen] = useState(false)
   const [tweaksOpen, setTweaksOpen] = useState(false)
@@ -471,6 +482,16 @@ export default function App() {
           </label>
         </div>
       )}
+
+      {/* Desktop notifications */}
+      <div className="notif-stack">
+        {notifications.map(n => (
+          <div key={n.id} className={`notif notif-${n.type}`}>
+            <span className="notif-text">{n.text}</span>
+            <button onClick={() => setNotifications(ns => ns.filter(x => x.id !== n.id))}>×</button>
+          </div>
+        ))}
+      </div>
     </>
   )
 }

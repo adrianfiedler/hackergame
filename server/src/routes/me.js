@@ -8,7 +8,7 @@ export default async function meRoutes(fastify) {
     const { playerId } = req.player
 
     const [[player]] = await db.query(
-      `SELECT id, username, wallet_addr, crypto, avatar_url, grace_ends_at, local_data
+      `SELECT id, username, wallet_addr, crypto, intel, zero_days, avatar_url, grace_ends_at, local_data
        FROM players WHERE id = ?`,
       [playerId]
     )
@@ -41,6 +41,8 @@ export default async function meRoutes(fastify) {
         username:     player.username,
         wallet_addr:  player.wallet_addr,
         crypto:       Number(player.crypto),
+        intel:        player.intel,
+        zero_days:    player.zero_days,
         avatar_url:   player.avatar_url,
         grace_ends_at: player.grace_ends_at,
       },

@@ -19,6 +19,7 @@ import playerRoutes from './routes/player.js'
 import hackRoutes from './routes/hack.js'
 import defenseRoutes from './routes/defense.js'
 import gridRoutes from './routes/grid.js'
+import operationsRoutes from './routes/operations.js'
 import db from './db.js'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
@@ -80,6 +81,7 @@ await fastify.register(playerRoutes)
 await fastify.register(gridRoutes)
 await fastify.register((f) => hackRoutes(f, io, onlinePlayers))
 await fastify.register((f) => defenseRoutes(f, io, onlinePlayers))
+await fastify.register((f) => operationsRoutes(f, io, onlinePlayers))
 
 // Channel name → channel_id (seeded in schema.sql)
 const PUBLIC_CHANNEL_IDS = {
