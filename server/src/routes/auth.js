@@ -86,9 +86,8 @@ async function allocateHierarchicalIp() {
   }
 
   // Find a free node in this subnet
-  // We avoid nodes 1-5 to reserve them for NPCs if it's a new subnet
   for (let i = 0; i < 50; i++) {
-    const node = Math.floor(Math.random() * (254 - 10) + 10)
+    const node = Math.floor(Math.random() * 254) + 1 // 1-254
     const ip = `10.${sector}.${subnet}.${node}`
     const [rows] = await db.query('SELECT id FROM machines WHERE ip_address = ?', [ip])
     if (!rows.length) return { ip, isNewSubnet, sector, subnet }
@@ -98,12 +97,25 @@ async function allocateHierarchicalIp() {
 }
 
 async function seedNeighborhoodNPCs(conn, sector, subnet) {
-  const npcCount = 2 + Math.floor(Math.random() * 2) // 2-3 NPCs
+  const npcCount = 10 + Math.floor(Math.random() * 6) // 10-15 NPCs
   const NPC_SYSTEM_ID = '00000000-0000-0000-0000-000000000001'
 
-  for (let i = 1; i <= npcCount; i++) {
+  for (let i = 0; i < npcCount; i++) {
+    // Find a free node for each NPC
+    let node = 0
+    let ip = ''
+    let attempts = 0
+    while (attempts < 50) {
+      node = Math.floor(Math.random() * 254) + 1 // 1-254
+      ip = `10.${sector}.${subnet}.${node}`
+      const [rows] = await conn.query('SELECT id FROM machines WHERE ip_address = ?', [ip])
+      if (!rows.length) break
+      attempts++
+    }
+
+    if (attempts >= 50) continue // Skip if we can't find a spot
+
     const hostname = `${ADJECTIVES[Math.floor(Math.random() * ADJECTIVES.length)]}-${NOUNS[Math.floor(Math.random() * NOUNS.length)]}.local`
-    const ip = `10.${sector}.${subnet}.${i}` // Reserve low nodes for NPCs
     
     await conn.query(
       `INSERT IGNORE INTO machines (id, owner_id, hostname, ip_address, tier, puzzle_kind, hack_reward, flavor)
