@@ -404,3 +404,99 @@ export function IrcApp({ player }) {
     </div>
   )
 }
+
+// ── NetMap ────────────────────────────────────────────────────────────────────
+export function NetMap({ onRunCommand }) {
+  const [loading, setLoading] = useState(true)
+  const [data, setData]       = useState({ sector: 0, subnet: 0, nodes: [] })
+  const [selected, setSelected] = useState(null)
+
+  const fetchNeighborhood = async () => {
+    setLoading(true)
+    try {
+      const res = await fetch('/api/grid/neighborhood')
+      if (res.ok) {
+        const d = await res.json()
+        setData(d)
+      }
+    } catch (err) {
+      console.error('[NetMap] fetch failed:', err)
+    } finally {
+      setTimeout(() => setLoading(false), 800) // Aesthetic delay
+    }
+  }
+
+  useEffect(() => { fetchNeighborhood() }, [])
+
+  const grid = Array.from({ length: 256 }, (_, i) => {
+    return data.nodes.find(n => n.node_id === i) || null
+  })
+
+  return (
+    <div className="netmap">
+      <div className="netmap-header">
+        <div className="netmap-title">NETMAP v4.0 — SCANNING 10.{data.sector}.{data.subnet}.*</div>
+        <button onClick={fetchNeighborhood} disabled={loading} className="netmap-refresh">RE-SCAN</button>
+      </div>
+
+      <div className="netmap-body">
+        <div className="netmap-grid-container">
+          {loading && (
+            <div className="netmap-overlay">
+              <div className="scanline-y" />
+              <div className="loading-text">INITIALIZING SUBSURFACE SCAN...</div>
+            </div>
+          )}
+          <div className="netmap-grid">
+            {grid.map((node, i) => (
+              <div key={i} 
+                className={`netmap-node ${node ? 'occupied' : ''} ${node?.is_self ? 'self' : ''} ${node?.is_npc ? 'npc' : ''} ${selected?.node_id === i ? 'selected' : ''} ${node?.owned ? 'owned' : ''}`}
+                onClick={() => node && setSelected(node)}
+                title={node ? `${node.hostname} (${node.ip})` : `10.${data.sector}.${data.subnet}.${i}`}
+              >
+                {node ? (node.is_self ? 'Y' : node.is_npc ? 'N' : 'P') : '·'}
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div className="netmap-sidebar">
+          {selected ? (
+            <div className="node-info">
+              <div className="info-label">HOSTNAME</div>
+              <div className="info-value">{selected.hostname}</div>
+              
+              <div className="info-label">ADDRESS</div>
+              <div className="info-value" style={{ color: 'var(--primary)' }}>{selected.ip}</div>
+              
+              <div className="info-label">OWNER</div>
+              <div className="info-value">{selected.owner}</div>
+
+              <div className="info-label">CLASS</div>
+              <div className="info-value">{selected.is_npc ? `Tier ${selected.tier} NPC` : 'Remote Operator'}</div>
+
+              <div className="node-actions" style={{ marginTop: 20 }}>
+                {selected.is_self ? (
+                  <div className="self-tag">LOCAL MACHINE</div>
+                ) : (
+                  <button className="hack-btn" onClick={() => onRunCommand(`hack ${selected.hostname}`)}>
+                    {selected.owned ? 'RE-CONNECT' : 'INFILTRATE'}
+                  </button>
+                )}
+              </div>
+            </div>
+          ) : (
+            <div className="no-node">SELECT A NODE TO ANALYZE</div>
+          )}
+          
+          <div className="legend">
+            <div className="leg-item"><span className="self">Y</span> YOU</div>
+            <div className="leg-item"><span className="npc">N</span> NPC</div>
+            <div className="leg-item"><span className="occupied">P</span> PLAYER</div>
+            <div className="leg-item"><span className="owned-indicator">█</span> ACCESSED</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}

@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { Win } from './window-manager.jsx'
 import { Terminal } from './terminal.jsx'
-import { Browser, Notepad, Calculator, TrashApp, Miner, IrcApp } from './apps.jsx'
+import { Browser, Notepad, Calculator, TrashApp, Miner, IrcApp, NetMap } from './apps.jsx'
 import { I } from './icons.jsx'
 import { Audio, fmtCrypto, fmtHs, DEFAULT_STATE, saveLocalState, scheduleSyncToServer } from './state.jsx'
 import { useAuth } from './auth/AuthContext.jsx'
@@ -36,6 +36,7 @@ const APPS = {
   trash:      { title: '/tmp/.TRASH',   size: { w: 420, h: 300 } },
   miner:      { title: 'CRYPTO-MINER',  size: { w: 420, h: 560 } },
   irc:        { title: 'IRC.EXE',       size: { w: 580, h: 420 } },
+  netmap:     { title: 'NETMAP.SYS',    size: { w: 680, h: 480 } },
 }
 
 const DESKTOP_ICONS = [
@@ -50,6 +51,7 @@ const DESKTOP_ICONS = [
     </svg>
   )},
   { app: 'irc',        label: 'IRC',         Glyph: () => <I.Irc /> },
+  { app: 'netmap',     label: 'NetMap',      Glyph: () => <I.NetMap /> },
   { app: 'trash',      label: 'Trash',       Glyph: ({ full }) => full ? <I.TrashFull /> : <I.Trash /> },
 ]
 
@@ -268,6 +270,17 @@ export default function App() {
   }
 
   const appContent = (win) => {
+    // We need to be able to trigger commands in terminal from other apps
+    const runInTerminal = (cmd) => {
+      // Find terminal win or open one
+      openApp('terminal')
+      // Small delay to allow terminal to mount/focus
+      setTimeout(() => {
+        const event = new CustomEvent('terminal:run', { detail: cmd })
+        window.dispatchEvent(event)
+      }, 50)
+    }
+
     switch (win.appId) {
       case 'terminal':   return <Terminal state={state} setState={setState} onOpenApp={openApp} />
       case 'browser':    return <Browser />
@@ -276,6 +289,7 @@ export default function App() {
       case 'trash':      return <TrashApp state={state} setState={setState} />
       case 'miner':      return <Miner state={state} />
       case 'irc':        return <IrcApp player={player} />
+      case 'netmap':     return <NetMap onRunCommand={runInTerminal} />
     }
   }
 

@@ -811,3 +811,88 @@ body[data-theme="amber"]   { --phos: var(--neon-y); }
 .login-footer {
   color: var(--dim); font-size: 12px; opacity: 0.5;
 }
+
+/* ── NetMap ───────────────────────────────────────────────────────────────── */
+.netmap {
+  display: flex; flex-direction: column; height: 100%; background: #050710;
+  color: #fff; font-family: "VT323", monospace;
+}
+.netmap-header {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 8px 12px; border-bottom: 1px solid #1a2340; background: #0a0e1a;
+}
+.netmap-title { color: var(--neon-c); font-size: 14px; letter-spacing: 0.1em; }
+.netmap-refresh {
+  background: transparent; border: 1px solid var(--neon-c); color: var(--neon-c);
+  font-family: inherit; font-size: 12px; cursor: pointer; padding: 2px 8px;
+}
+.netmap-refresh:hover { background: var(--neon-c); color: #000; }
+.netmap-refresh:disabled { opacity: 0.4; }
+
+.netmap-body { display: flex; flex: 1; overflow: hidden; }
+
+.netmap-grid-container {
+  flex: 1; position: relative; display: flex; align-items: center; justify-content: center;
+  background: radial-gradient(circle at center, #0a1126, #050710);
+  padding: 10px; overflow: hidden;
+}
+.netmap-grid {
+  display: grid;
+  grid-template-columns: repeat(16, 1fr);
+  grid-template-rows: repeat(16, 1fr);
+  gap: 2px;
+  width: 100%; height: 100%; max-width: 440px; max-height: 440px;
+}
+.netmap-node {
+  border: 1px solid rgba(26, 35, 64, 0.5);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 11px; color: #1a2340; cursor: default;
+  transition: all 0.2s; user-select: none;
+}
+.netmap-node.occupied { color: var(--neon-c); border-color: #3a4a60; cursor: pointer; }
+.netmap-node.occupied:hover { border-color: var(--neon-c); box-shadow: 0 0 8px var(--neon-c); z-index: 2; }
+.netmap-node.self { color: var(--neon-m); border-color: var(--neon-m); font-weight: bold; }
+.netmap-node.npc { color: var(--neon-y); }
+.netmap-node.selected { border-color: #fff !important; box-shadow: 0 0 12px #fff; z-index: 3; color: #fff; }
+.netmap-node.owned { background: rgba(0, 231, 255, 0.15); border-color: var(--neon-c); }
+
+.netmap-overlay {
+  position: absolute; inset: 0; background: rgba(5, 7, 16, 0.8);
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  z-index: 10; gap: 12px;
+}
+.scanline-y {
+  width: 100%; height: 2px; background: var(--neon-c);
+  box-shadow: 0 0 15px var(--neon-c);
+  position: absolute; top: 0; left: 0;
+  animation: scanning-y 1.5s linear infinite;
+}
+@keyframes scanning-y {
+  from { top: 0% }
+  to { top: 100% }
+}
+.loading-text { color: var(--neon-c); letter-spacing: 0.2em; font-size: 18px; text-shadow: 0 0 8px var(--neon-c); }
+
+.netmap-sidebar {
+  width: 200px; border-left: 1px solid #1a2340; background: #070914;
+  padding: 16px; display: flex; flex-direction: column; gap: 20px;
+}
+.no-node { color: var(--dim); font-size: 14px; text-align: center; margin-top: 40px; font-style: italic; }
+.info-label { font-size: 10px; color: var(--dim); letter-spacing: 0.1em; margin-bottom: 2px; }
+.info-value { font-size: 16px; color: #fff; margin-bottom: 12px; word-break: break-all; }
+.hack-btn {
+  width: 100%; padding: 10px; background: transparent; border: 1px solid var(--neon-c);
+  color: var(--neon-c); font-family: inherit; font-size: 16px; cursor: pointer;
+  box-shadow: 0 0 10px rgba(0,231,255,0.2);
+}
+.hack-btn:hover { background: var(--neon-c); color: #000; box-shadow: 0 0 15px var(--neon-c); }
+.self-tag { color: var(--neon-m); border: 1px solid var(--neon-m); padding: 4px; text-align: center; }
+
+.legend { margin-top: auto; border-top: 1px solid #1a2340; padding-top: 12px; display: flex; flex-direction: column; gap: 6px; }
+.leg-item { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--dim); }
+.leg-item span { width: 14px; height: 14px; display: flex; align-items: center; justify-content: center; font-size: 10px; border: 1px solid #1a2340; }
+.leg-item .self { color: var(--neon-m); border-color: var(--neon-m); }
+.leg-item .npc { color: var(--neon-y); border-color: var(--neon-y); }
+.leg-item .occupied { color: var(--neon-c); border-color: var(--neon-c); }
+.leg-item .owned-indicator { background: rgba(0, 231, 255, 0.25); border-color: var(--neon-c); color: transparent; }
+

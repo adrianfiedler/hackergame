@@ -52,6 +52,14 @@ export function Terminal({ state, setState, onOpenApp }) {
   }
 
   useEffect(() => {
+    const onRemoteCmd = (e) => {
+      if (e.detail) runCmd(e.detail)
+    }
+    window.addEventListener('terminal:run', onRemoteCmd)
+    return () => window.removeEventListener('terminal:run', onRemoteCmd)
+  }, [])
+
+  useEffect(() => {
     ;(async () => {
       await typeOut(' /$$   /$$  /$$$$$$   /$$$$$$  /$$   /$$', 'mag', 0.3)
       await typeOut('| $$  | $$ /$$__  $$ /$$__  $$| $$  /$$/','mag', 0.3)

@@ -4,7 +4,6 @@ import { signJwt } from '../auth/jwt.js'
 
 const ADJECTIVES = ['dark','ghost','shadow','void','null','zero','cyber','neo','byte','hex','neon','phr34k']
 const NOUNS      = ['net','node','sys','core','data','root','host','gate','flux','r00t','0day','shell']
-const IP_SUBNETS = ['10','172','192']
 
 function generateWallet() {
   return '0x' + randomBytes(20).toString('hex')
@@ -14,12 +13,6 @@ function generateHostname(base) {
   const clean = base.replace(/[^a-z0-9]/gi, '').toLowerCase().slice(0, 8) || 'op'
   const suffix = NOUNS[Math.floor(Math.random() * NOUNS.length)]
   return `${clean}.${suffix}`
-}
-
-function generateIp() {
-  const sub = IP_SUBNETS[Math.floor(Math.random() * IP_SUBNETS.length)]
-  const r = () => Math.floor(Math.random() * 254) + 1
-  return `${sub}.${r()}.${r()}.${r()}`
 }
 
 function sanitizeUsername(googleName) {
@@ -51,13 +44,73 @@ async function findUniqueHostname(base) {
   return `op${randomBytes(3).toString('hex')}.node`
 }
 
-async function findUniqueIp() {
-  for (let i = 0; i < 50; i++) {
-    const ip = generateIp()
-    const [rows] = await db.query('SELECT id FROM machines WHERE ip_address = ?', [ip])
-    if (!rows.length) return ip
+/**
+ * Finds a suitable IP in the 10.S.B.N format.
+ * Clusters players into subnets.
+ * Returns { ip, isNewSubnet, sector, subnet }
+ */
+async function allocateHierarchicalIp() {
+  // Find latest player-occupied subnet
+  const [latest] = await db.query(`
+    SELECT ip_address FROM machines 
+    WHERE owner_id != '00000000-0000-0000-0000-000000000001'
+    AND ip_address LIKE '10.%'
+    ORDER BY created_at DESC LIMIT 1
+  `)
+
+  let sector = 0
+  let subnet = 0
+
+  if (latest.length) {
+    const parts = latest[0].ip_address.split('.').map(Number)
+    sector = parts[1]
+    subnet = parts[2]
   }
-  throw new Error('Could not generate unique IP after 50 attempts')
+
+  // Check density (players only)
+  const [countRows] = await db.query(
+    "SELECT COUNT(*) as count FROM machines WHERE ip_address LIKE ? AND owner_id != '00000000-0000-0000-0000-000000000001'",
+    [`10.${sector}.${subnet}.%`]
+  )
+
+  const isFull = countRows[0].count >= 40
+  let isNewSubnet = false
+
+  if (isFull || !latest.length) {
+    isNewSubnet = true
+    subnet++
+    if (subnet > 255) {
+      subnet = 0
+      sector++
+    }
+  }
+
+  // Find a free node in this subnet
+  // We avoid nodes 1-5 to reserve them for NPCs if it's a new subnet
+  for (let i = 0; i < 50; i++) {
+    const node = Math.floor(Math.random() * (254 - 10) + 10)
+    const ip = `10.${sector}.${subnet}.${node}`
+    const [rows] = await db.query('SELECT id FROM machines WHERE ip_address = ?', [ip])
+    if (!rows.length) return { ip, isNewSubnet, sector, subnet }
+  }
+
+  throw new Error('Failed to find free node in subnet')
+}
+
+async function seedNeighborhoodNPCs(conn, sector, subnet) {
+  const npcCount = 2 + Math.floor(Math.random() * 2) // 2-3 NPCs
+  const NPC_SYSTEM_ID = '00000000-0000-0000-0000-000000000001'
+
+  for (let i = 1; i <= npcCount; i++) {
+    const hostname = `${ADJECTIVES[Math.floor(Math.random() * ADJECTIVES.length)]}-${NOUNS[Math.floor(Math.random() * NOUNS.length)]}.local`
+    const ip = `10.${sector}.${subnet}.${i}` // Reserve low nodes for NPCs
+    
+    await conn.query(
+      `INSERT IGNORE INTO machines (id, owner_id, hostname, ip_address, tier, puzzle_kind, hack_reward, flavor)
+       VALUES (UUID(), ?, ?, ?, 1, 'portscan', 0.01, ?)`,
+      [NPC_SYSTEM_ID, hostname, ip, 'Local neighborhood node. High latency but low security.']
+    )
+  }
 }
 
 async function upsertPlayer(profile) {
@@ -79,7 +132,7 @@ async function upsertPlayer(profile) {
   const username  = await findUniqueUsername(sanitizeUsername(name))
   const wallet    = generateWallet()
   const hostname  = await findUniqueHostname(username)
-  const ip        = await findUniqueIp()
+  const { ip, isNewSubnet, sector, subnet } = await allocateHierarchicalIp()
   const machineId = randomUUID()
 
   // System channel (personal log) for the player
@@ -101,6 +154,10 @@ async function upsertPlayer(profile) {
       [machineId, playerId, hostname, ip]
     )
 
+    if (isNewSubnet) {
+      await seedNeighborhoodNPCs(conn, sector, subnet)
+    }
+
     await conn.query(
       `INSERT INTO channels (id, name, kind) VALUES (?, NULL, 'system')`,
       [systemChannelId]
@@ -118,7 +175,7 @@ async function upsertPlayer(profile) {
     conn.release()
   }
 
-  console.log(`[auth] new player created: ${username} (${ip})`)
+  console.log(`[auth] new player created: ${username} (${ip}) in subnet ${sector}.${subnet}`)
   return { id: playerId, username }
 }
 
