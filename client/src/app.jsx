@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { Win } from './window-manager.jsx'
 import { Terminal } from './terminal.jsx'
-import { Browser, Notepad, Calculator, TrashApp, Miner, IrcApp, NetMap } from './apps.jsx'
+import { Browser, Notepad, Calculator, TrashApp, Miner, IrcApp, NetMap, MusicPlayer } from './apps.jsx'
 import { I } from './icons.jsx'
 import { Audio, fmtCrypto, fmtHs, DEFAULT_STATE, saveLocalState, scheduleSyncToServer } from './state.jsx'
 import { useAuth } from './auth/AuthContext.jsx'
@@ -37,6 +37,7 @@ const APPS = {
   miner:      { title: 'CRYPTO-MINER',  size: { w: 420, h: 560 } },
   irc:        { title: 'IRC.EXE',       size: { w: 580, h: 420 } },
   netmap:     { title: 'NETMAP.SYS',    size: { w: 680, h: 480 } },
+  music:      { title: 'MEDIA.PLAYER',  size: { w: 380, h: 530 } },
 }
 
 const DESKTOP_ICONS = [
@@ -53,6 +54,7 @@ const DESKTOP_ICONS = [
   { app: 'irc',        label: 'IRC',         Glyph: () => <I.Irc /> },
   { app: 'netmap',     label: 'NetMap',      Glyph: () => <I.NetMap /> },
   { app: 'trash',      label: 'Trash',       Glyph: ({ full }) => full ? <I.TrashFull /> : <I.Trash /> },
+  { app: 'music',      label: 'Media Player',Glyph: () => <I.Music /> },
 ]
 
 export default function App() {
@@ -301,6 +303,7 @@ export default function App() {
       case 'miner':      return <Miner state={state} />
       case 'irc':        return <IrcApp player={player} />
       case 'netmap':     return <NetMap onRunCommand={runInTerminal} />
+      case 'music':      return <MusicPlayer />
     }
   }
 

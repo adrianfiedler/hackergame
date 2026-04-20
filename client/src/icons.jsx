@@ -84,6 +84,15 @@ export const I = {
       <path d="M3 20l6-5 5 4 4-3 7 5" stroke="currentColor" strokeWidth="1.2"/>
     </svg>
   ),
+  Music: ({ size = 32 }) => (
+    <svg width={size} height={size} viewBox="0 0 32 32" fill="none">
+      <path d="M12 24V11l14-3.5v13" stroke="currentColor" strokeWidth="1.5" strokeLinecap="square"/>
+      <circle cx="9" cy="24" r="3.5" stroke="currentColor" strokeWidth="1.4"/>
+      <circle cx="23" cy="20.5" r="3.5" stroke="currentColor" strokeWidth="1.4"/>
+      <circle cx="9" cy="24" r="1" fill="currentColor"/>
+      <circle cx="23" cy="20.5" r="1" fill="currentColor"/>
+    </svg>
+  ),
   NetMap: ({ size = 32 }) => (
     <svg width={size} height={size} viewBox="0 0 32 32" fill="none">
       <rect x="2" y="5" width="28" height="22" stroke="currentColor" strokeWidth="1.5"/>

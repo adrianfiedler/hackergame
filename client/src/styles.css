@@ -978,3 +978,140 @@ body[data-theme="amber"]   { --phos: var(--neon-y); }
 .nm-collect-btn:hover:not(:disabled) { background: var(--neon-g, #39ff14); color: #000; }
 .nm-collect-btn:disabled { opacity: 0.5; cursor: default; }
 
+/* ── MusicPlayer ──────────────────────────────────────────────────────────── */
+.mp {
+  display: flex; flex-direction: column; height: 100%;
+  background: var(--bg-1); overflow-y: auto;
+  font-family: "Share Tech Mono", monospace;
+}
+.mp-hdr {
+  text-align: center; padding: 8px 12px 7px;
+  color: var(--phos); letter-spacing: 0.22em; font-size: 12px;
+  border-bottom: 1px solid var(--grid);
+  text-shadow: 0 0 10px var(--phos);
+  background: var(--bg);
+}
+
+/* Visualizer */
+.mp-viz {
+  display: flex; align-items: flex-end; justify-content: stretch;
+  gap: 2px; height: 54px; padding: 6px 10px 0;
+  background: #050710; border-bottom: 1px solid var(--grid);
+  overflow: hidden;
+}
+.mp-bar {
+  flex: 1;
+  background: linear-gradient(to top, var(--phos) 0%, rgba(255,255,255,0.9) 100%);
+  box-shadow: 0 0 5px var(--phos);
+  transition: height 70ms ease-out;
+  min-height: 3px;
+}
+
+/* Now playing */
+.mp-nowplaying {
+  padding: 9px 14px 7px;
+  border-bottom: 1px solid var(--grid);
+  background: linear-gradient(180deg, rgba(0,231,255,0.03) 0%, transparent 100%);
+}
+.mp-track-title {
+  font-size: 14px; color: #fff; letter-spacing: 0.06em;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  text-shadow: 0 0 8px rgba(255,255,255,0.25);
+}
+.mp-track-meta { font-size: 10px; color: var(--dim); margin-top: 3px; letter-spacing: 0.08em; }
+
+/* Progress */
+.mp-prog-wrap { padding: 10px 14px 0; cursor: pointer; }
+.mp-prog {
+  height: 5px; background: var(--bg-2);
+  border: 1px solid var(--grid); position: relative;
+}
+.mp-prog-fill {
+  height: 100%; background: var(--phos);
+  box-shadow: 0 0 8px var(--phos);
+  transition: width 100ms linear;
+}
+.mp-prog-head {
+  position: absolute; top: 50%; transform: translate(-50%, -50%);
+  width: 9px; height: 9px; background: #fff;
+  border: 2px solid var(--phos); box-shadow: 0 0 6px var(--phos);
+  transition: left 100ms linear;
+}
+.mp-prog-wrap:hover .mp-prog { border-color: var(--phos); }
+.mp-times {
+  display: flex; justify-content: space-between;
+  padding: 3px 14px 0; font-size: 10px; color: var(--dim);
+}
+
+/* Controls */
+.mp-ctrl {
+  display: flex; align-items: center; justify-content: center;
+  gap: 5px; padding: 10px 14px;
+  border-bottom: 1px solid var(--grid);
+}
+.mp-btn {
+  background: var(--bg-2); border: 1px solid var(--grid);
+  color: var(--fg); font-family: "Share Tech Mono", monospace;
+  font-size: 14px; cursor: pointer; padding: 6px 11px;
+  transition: border-color 0.1s, color 0.1s, box-shadow 0.1s;
+  line-height: 1;
+}
+.mp-btn:hover { border-color: var(--phos); color: var(--phos); box-shadow: 0 0 7px rgba(0,231,255,0.25); }
+.mp-btn.mp-lg {
+  font-size: 17px; padding: 7px 20px;
+  border-color: var(--phos); color: var(--phos);
+  box-shadow: 0 0 12px rgba(0,231,255,0.25);
+}
+.mp-btn.mp-lg:hover { background: var(--phos); color: #000; box-shadow: 0 0 18px var(--phos); }
+.mp-btn.mp-sm { font-size: 13px; padding: 5px 9px; }
+.mp-btn.mp-on {
+  border-color: var(--phos); color: var(--phos);
+  background: rgba(0,231,255,0.09);
+  box-shadow: 0 0 7px rgba(0,231,255,0.2);
+}
+
+/* Volume */
+.mp-vol-row {
+  display: flex; align-items: center; gap: 8px;
+  padding: 7px 14px 9px; border-bottom: 1px solid var(--grid);
+}
+.mp-vol-lbl { font-size: 10px; color: var(--dim); letter-spacing: 0.12em; min-width: 24px; }
+.mp-vol-track {
+  flex: 1; display: flex; gap: 2px; cursor: pointer;
+  height: 16px; align-items: center;
+}
+.mp-vol-seg {
+  flex: 1; height: 9px; background: var(--bg-2);
+  border: 1px solid var(--grid); transition: background 0.08s, box-shadow 0.08s;
+}
+.mp-vol-seg.mp-on {
+  background: var(--phos); border-color: var(--phos);
+  box-shadow: 0 0 3px var(--phos);
+}
+.mp-vol-pct { font-size: 10px; color: var(--phos); min-width: 28px; text-align: right; }
+
+/* Playlist */
+.mp-playlist { flex: 1; overflow-y: auto; }
+.mp-pl-hdr {
+  padding: 5px 14px; font-size: 10px; color: var(--dim);
+  letter-spacing: 0.12em; border-bottom: 1px solid var(--grid);
+  background: var(--bg); position: sticky; top: 0;
+}
+.mp-pl-row {
+  display: flex; align-items: center; gap: 8px;
+  padding: 8px 14px; cursor: pointer;
+  border-bottom: 1px solid rgba(26,31,58,0.4);
+  font-size: 12px; transition: background 0.1s;
+}
+.mp-pl-row:hover { background: var(--bg-2); }
+.mp-pl-row.active {
+  background: rgba(0,231,255,0.05);
+  border-left: 2px solid var(--phos);
+  padding-left: 12px;
+}
+.mp-pl-row.active .mp-pl-name { color: var(--phos); text-shadow: 0 0 6px var(--phos); }
+.mp-pl-num { color: var(--dim); font-size: 10px; min-width: 18px; }
+.mp-pl-name { flex: 1; letter-spacing: 0.04em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mp-pl-dur  { color: var(--dim); font-size: 10px; min-width: 34px; text-align: right; }
+.mp-pl-ind  { color: var(--phos); font-size: 10px; min-width: 14px; text-align: right; }
+
